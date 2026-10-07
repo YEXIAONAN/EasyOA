@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.easyoa.audit.application.AuditEntry;
 import com.easyoa.audit.application.AuditService;
 import com.easyoa.audit.domain.RiskLevel;
+import com.easyoa.approval.application.ApprovalPermissionService;
 import com.easyoa.comment.domain.Comment;
 import com.easyoa.comment.repository.CommentRepository;
 import com.easyoa.common.audit.AuditActions;
@@ -55,6 +56,7 @@ public class FileService {
     private final CommentRepository commentRepository;
     private final TaskPermissionService taskPermissionService;
     private final ProjectPermissionService projectPermissionService;
+    private final ApprovalPermissionService approvalPermissionService;
     private final UserService userService;
     private final AuditService auditService;
 
@@ -62,13 +64,15 @@ public class FileService {
 
     public FileService(FileObjectRepository fileObjectRepository, FileStorageService storageService,
             CommentRepository commentRepository, TaskPermissionService taskPermissionService,
-            ProjectPermissionService projectPermissionService, UserService userService, AuditService auditService,
+            ProjectPermissionService projectPermissionService, ApprovalPermissionService approvalPermissionService,
+            UserService userService, AuditService auditService,
             @Value("${easyoa.storage.max-file-size:20971520}") long maxFileSize) {
         this.fileObjectRepository = fileObjectRepository;
         this.storageService = storageService;
         this.commentRepository = commentRepository;
         this.taskPermissionService = taskPermissionService;
         this.projectPermissionService = projectPermissionService;
+        this.approvalPermissionService = approvalPermissionService;
         this.userService = userService;
         this.auditService = auditService;
         this.maxFileSize = maxFileSize;
@@ -154,13 +158,19 @@ public class FileService {
     public void delete(Long fileId) {
         SecurityUser actor = taskPermissionService.requireAuthenticated();
         FileObject file = requireActive(fileId);
-        Task task = resolveTask(file);
-
         boolean uploader = file.getUploader().getId().equals(actor.id());
-        if (!uploader) {
-            ProjectRole role = projectPermissionService.roleOf(task.getProject().getId(), actor.id());
-            if (!taskPermissionService.canManage(task, actor, role)) {
-                throw ApiException.forbidden("只有上传者或任务负责人可以删除附件");
+
+        if (file.getResourceType() == FileResourceType.APPROVAL) {
+            if (!uploader && !actor.systemRole().isAdminLike()) {
+                throw ApiException.forbidden("只有上传者或管理员可以删除附件");
+            }
+        } else {
+            Task task = resolveTask(file);
+            if (!uploader) {
+                ProjectRole role = projectPermissionService.roleOf(task.getProject().getId(), actor.id());
+                if (!taskPermissionService.canManage(task, actor, role)) {
+                    throw ApiException.forbidden("只有上传者或任务负责人可以删除附件");
+                }
             }
         }
         file.markDeleted();
@@ -204,6 +214,63 @@ public class FileService {
         return linked;
     }
 
+    // --- 审批附件（Phase 6） ---------------------------------------------------------
+
+    /** 上传审批表单附件（草稿阶段：resource_id = 0，提交时挂载到实例）。 */
+    @Transactional
+    public FileView uploadApprovalAttachment(MultipartFile multipartFile) {
+        SecurityUser actor = taskPermissionService.requireAuthenticated();
+        ValidatedUpload upload = validate(multipartFile);
+        FileStorageService.StoredFile stored;
+        try {
+            stored = storageService.store(multipartFile.getInputStream(), upload.extension());
+        } catch (java.io.IOException ex) {
+            throw new ApiException(ErrorCode.INTERNAL_ERROR, "附件读取失败，请稍后重试");
+        }
+        User uploader = userService.getById(actor.id());
+        FileObject file = new FileObject(upload.originalName(), stored.storedName(), upload.mimeType(),
+                stored.size(), stored.sha256(), uploader, FileResourceType.APPROVAL, 0L);
+        fileObjectRepository.save(file);
+
+        auditService.record(AuditEntry.action(AuditActions.FILE_UPLOADED, RiskLevel.NORMAL)
+                .resource("FILE", file.getId())
+                .after(Map.of("resourceType", "APPROVAL", "name", file.getOriginalName(), "size", file.getSize()))
+                .reason("上传审批附件"));
+        return FileView.from(file);
+    }
+
+    /** 审批提交时把本人上传的草稿附件挂载到实例。 */
+    @Transactional
+    public List<FileObject> linkToApproval(Long instanceId, List<Long> fileIds, SecurityUser actor) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return List.of();
+        }
+        List<FileObject> linked = new ArrayList<>();
+        for (Long fileId : new LinkedHashSet<>(fileIds)) {
+            if (fileId == null) {
+                continue;
+            }
+            FileObject file = requireActive(fileId);
+            if (file.getResourceType() != FileResourceType.APPROVAL) {
+                throw new ApiException(ErrorCode.UNPROCESSABLE, "附件不属于审批表单");
+            }
+            if (!file.getUploader().getId().equals(actor.id())) {
+                throw ApiException.forbidden("只能引用自己上传的附件");
+            }
+            file.relink(FileResourceType.APPROVAL, instanceId);
+            fileObjectRepository.save(file);
+            linked.add(file);
+        }
+        return linked;
+    }
+
+    @Transactional(readOnly = true)
+    public List<FileView> listByApproval(Long instanceId) {
+        return fileObjectRepository.findActiveByResource(FileResourceType.APPROVAL, instanceId).stream()
+                .map(FileView::from)
+                .toList();
+    }
+
     // --- 内部方法 ---------------------------------------------------------------
 
     private FileObject requireActive(Long fileId) {
@@ -213,11 +280,23 @@ public class FileService {
         return file;
     }
 
-    /** 资源权限：TASK → 任务可见；COMMENT → 评论所属任务可见（非成员一律 404）。 */
+    /** 资源权限：TASK → 任务可见；COMMENT → 评论所属任务可见；APPROVAL → 审批实例可见（非参与人一律 404）。 */
     private void requireFileViewable(FileObject file) {
         try {
             if (file.getResourceType() == FileResourceType.TASK) {
                 taskPermissionService.requireViewable(file.getResourceId());
+                return;
+            }
+            if (file.getResourceType() == FileResourceType.APPROVAL) {
+                if (file.getResourceId() == null || file.getResourceId() == 0L) {
+                    // 草稿附件尚未挂载实例：只允许上传者本人访问
+                    SecurityUser actor = taskPermissionService.requireAuthenticated();
+                    if (!file.getUploader().getId().equals(actor.id())) {
+                        throw ApiException.notFound("文件不存在或无权访问");
+                    }
+                    return;
+                }
+                approvalPermissionService.requireViewable(file.getResourceId());
                 return;
             }
             Comment comment = commentRepository.findById(file.getResourceId())

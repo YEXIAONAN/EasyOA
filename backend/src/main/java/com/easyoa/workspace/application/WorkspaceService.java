@@ -3,6 +3,7 @@ package com.easyoa.workspace.application;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.easyoa.approval.application.ApprovalService;
 import com.easyoa.project.application.ProjectService;
 import com.easyoa.task.application.TaskService;
 import com.easyoa.user.application.UserService;
@@ -14,9 +15,8 @@ import com.easyoa.workspace.dto.WorkspaceSummaryResponse.UserBrief;
 /**
  * 工作台聚合服务。
  *
- * <p>已接入真实数据：当前用户信息、活动会话（前端另行查询）、进行中项目 KPI、项目进度列表、
- * 任务相关 KPI（我的任务 / 即将到期）与「我的任务」区块。
- * 审批相关统计待 Phase 6 交付后接入，当前返回 0（前端按空状态渲染，不做假数据）。
+ * <p>全部 KPI 与区块均为真实数据：当前用户信息、活动会话（前端另行查询）、
+ * 我的任务 / 即将到期、待我审批、进行中项目、项目进度。
  */
 @Service
 public class WorkspaceService {
@@ -27,11 +27,14 @@ public class WorkspaceService {
     private final UserService userService;
     private final ProjectService projectService;
     private final TaskService taskService;
+    private final ApprovalService approvalService;
 
-    public WorkspaceService(UserService userService, ProjectService projectService, TaskService taskService) {
+    public WorkspaceService(UserService userService, ProjectService projectService, TaskService taskService,
+            ApprovalService approvalService) {
         this.userService = userService;
         this.projectService = projectService;
         this.taskService = taskService;
+        this.approvalService = approvalService;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +42,7 @@ public class WorkspaceService {
         UserProfileResponse profile = userService.getProfile(userId);
         KpiSummary kpis = new KpiSummary(
                 taskService.countMyOpenTasks(userId),
-                0,
+                approvalService.countPendingForApprover(userId),
                 projectService.countActiveProjects(userId),
                 taskService.countMyDueSoonTasks(userId));
 
@@ -48,6 +51,7 @@ public class WorkspaceService {
                         profile.avatarUrl(), profile.lastLoginAt()),
                 kpis,
                 taskService.recentMyTasks(userId, MY_TASK_LIMIT),
+                approvalService.recentPendingForApprover(userId),
                 projectService.recentProjectsFor(userId, RECENT_PROJECT_LIMIT));
     }
 }

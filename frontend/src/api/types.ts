@@ -70,6 +70,8 @@ export interface WorkspaceSummary {
   }
   /** 「我的任务」区块（Phase 4 起为真实数据） */
   myTasks: TaskCard[]
+  /** 「待我审批」区块（Phase 6 起为真实数据；必须进入详情处理，不支持一键批准） */
+  pendingApprovals: ApprovalCard[]
   /** 当前用户参与的项目（工作台「项目进度」区块，Phase 3 起为真实数据） */
   projectProgress: ProjectCard[]
 }
@@ -461,4 +463,161 @@ export interface CreateCommentPayload {
   parentId?: number | null
   mentionUserIds?: number[]
   attachmentFileIds?: number[]
+}
+
+// ---------------------------------------------------------------------------
+// 审批（Phase 6）
+// ---------------------------------------------------------------------------
+
+export type ApprovalStatusType = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'RETURNED' | 'CANCELLED'
+export type ApprovalScope = 'PENDING' | 'MINE' | 'FINISHED'
+export type NodeModeType = 'ANY_ONE' | 'ALL'
+export type ApprovalNodeStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type ApprovalApproverStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'RETURNED' | 'TRANSFERRED_OUT'
+export type ApproverRuleType =
+  | 'FIXED_USER'
+  | 'DIRECT_MANAGER'
+  | 'PRIMARY_DEPT_MANAGER'
+  | 'ORG_UNIT_MANAGER'
+  | 'PROJECT_OWNER'
+  | 'PROJECT_DEPUTY'
+  | 'SYSTEM_ROLE'
+
+export type FormFieldType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'MONEY'
+  | 'DATE'
+  | 'DATETIME'
+  | 'SELECT'
+  | 'MULTI_SELECT'
+  | 'USER'
+  | 'ATTACHMENT'
+
+/** 审批表单字段定义（模板与实例快照共用） */
+export interface FormFieldDef {
+  key: string
+  label: string
+  type: FormFieldType
+  required: boolean
+  options?: string[] | null
+  placeholder?: string | null
+}
+
+/** 动态审批人规则（含可选备用规则） */
+export interface ApproverRule {
+  type: ApproverRuleType
+  userId?: number | null
+  systemRole?: string | null
+  projectField?: string | null
+  fallback?: ApproverRule[] | null
+}
+
+export interface NodeDefinition {
+  name: string
+  mode: NodeModeType
+  approvers: ApproverRule[]
+}
+
+export interface ApprovalTemplateSummary {
+  id: number
+  name: string
+  description?: string | null
+  enabled: boolean
+  latestVersionNo: number
+  updatedAt: string
+}
+
+export interface ApprovalTemplateVersion {
+  versionNo: number
+  name: string
+  description?: string | null
+  formFields: FormFieldDef[]
+  nodes: NodeDefinition[]
+  createdAt: string
+}
+
+export interface ApprovalTemplateDetail extends ApprovalTemplateSummary {
+  latestVersion: ApprovalTemplateVersion
+}
+
+/** 审批卡片：类型 / 申请人 / 申请时间 / 当前节点 / 状态 */
+export interface ApprovalCard {
+  id: number
+  title: string
+  templateName: string
+  status: ApprovalStatusType
+  applicant: TaskUserBrief
+  currentNodeName?: string | null
+  createdAt: string
+  submittedAt?: string | null
+  updatedAt: string
+}
+
+export interface ApprovalApproverView {
+  user: TaskUserBrief
+  ruleType: ApproverRuleType
+  status: ApprovalApproverStatus
+  comment?: string | null
+  actedAt?: string | null
+  transferredIn: boolean
+}
+
+export interface ApprovalNodeView {
+  index: number
+  name: string
+  mode: NodeModeType
+  status: ApprovalNodeStatus
+  current: boolean
+  approvers: ApprovalApproverView[]
+}
+
+export interface ApprovalActionView {
+  action: string
+  actor: TaskUserBrief
+  comment?: string | null
+  createdAt: string
+}
+
+export interface ApprovalPermissions {
+  canSubmit: boolean
+  canEditForm: boolean
+  canWithdraw: boolean
+  canApprove: boolean
+  canReject: boolean
+  canReturn: boolean
+  canTransfer: boolean
+}
+
+export interface ApprovalDetail {
+  id: number
+  title: string
+  templateName: string
+  templateVersionNo: number
+  status: ApprovalStatusType
+  applicant: TaskUserBrief
+  formFields: FormFieldDef[]
+  formValues: Record<string, unknown>
+  attachments: FileMeta[]
+  nodes: ApprovalNodeView[]
+  actions: ApprovalActionView[]
+  permissions: ApprovalPermissions
+  createdAt: string
+  submittedAt?: string | null
+  finishedAt?: string | null
+  updatedAt: string
+}
+
+export interface CreateApprovalPayload {
+  templateId: number
+  title: string
+  values: Record<string, unknown>
+}
+
+export interface TemplatePayload {
+  name: string
+  description?: string
+  formFields: FormFieldDef[]
+  nodes: NodeDefinition[]
 }

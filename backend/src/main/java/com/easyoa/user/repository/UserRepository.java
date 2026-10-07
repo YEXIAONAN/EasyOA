@@ -23,6 +23,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     long countBySystemRoleAndStatus(SystemRole systemRole, UserStatus status);
 
+    /** 指定系统角色的有效用户（审批动态审批人 SYSTEM_ROLE 解析）。 */
+    @Query("""
+            select u from User u
+            where u.systemRole = :role and u.status = :status
+            order by u.id asc
+            """)
+    java.util.List<User> findActiveBySystemRole(@Param("role") SystemRole role, @Param("status") UserStatus status);
+
     /** 系统是否已存在任何用户（用于首启初始化判定）。 */
     @Query("select count(u) from User u")
     long countAllUsers();

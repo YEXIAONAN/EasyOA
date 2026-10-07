@@ -72,13 +72,17 @@ EasyOA 优先保证：
 | ------------------------------------ | ---------------------------- |
 | ![评论](docs/screenshots/task-comments.png) | ![附件](docs/screenshots/task-attachment.png) |
 
+| 审批列表（待我审批 / 我发起的） | 审批详情（流程 / 表单快照 / 历史） |
+| -------------------------------- | ----------------------------------- |
+| ![审批列表](docs/screenshots/approval-list.png) | ![审批详情](docs/screenshots/approval-detail.png) |
+
 > 以上截图取自本地真实运行界面（Phase 4 交付版本，数据为真实数据：账号、会话、组织、项目、任务与审计均已生效）。
 
 ---
 
 ## Features
 
-### v0.1.0 已交付（Phase 0 ~ Phase 5）
+### v0.1.0 已交付（Phase 0 ~ Phase 6）
 
 **账号与安全**
 
@@ -129,6 +133,18 @@ EasyOA 优先保证：
 - **存储与元数据**：磁盘使用 UUID 随机存储名（原始文件名只做元数据），目录分片 + 路径前缀校验防目录遍历；保存 original_name / stored_name / mime_type / size / sha256 / uploader / resource_type / resource_id
 - **上传策略**：大小限制、危险扩展名黑名单（exe / sh / jar 等）、空文件拒绝、文件名清洗（去目录成分与控制字符）；删除为软删除（记录与磁盘文件保留）
 
+**审批（Phase 6）**
+
+- **模板化审批**：模板内容**版本化**（form_schema + node_schema 只追加新版本），新申请使用最新版本，已运行实例始终绑定发起时版本，历史审批不受模板更新影响
+- **自定义审批表单**：TEXT / TEXTAREA / NUMBER / MONEY / DATE / DATETIME / SELECT / MULTI_SELECT / USER / ATTACHMENT；发起时保存 **Template Version + Form Snapshot**
+- **审批实例状态机**：DRAFT → PENDING → APPROVED / REJECTED / RETURNED / CANCELLED；进入 PENDING 后申请人不可修改表单（只能撤回或等待退回）
+- **多人审批**：节点支持 **ANY_ONE**（任一通过）与 **ALL**（全部通过）；v0.1.0 不做 2/3、60% 投票等复杂规则
+- **动态审批人**：FIXED_USER / DIRECT_MANAGER（沿组织链向上、跳过申请人）/ PRIMARY_DEPT_MANAGER / ORG_UNIT_MANAGER / PROJECT_OWNER / PROJECT_DEPUTY / SYSTEM_ROLE；**发起时解析并生成审批人快照**，组织变化不影响运行中的实例
+- **自我审批禁止**：解析结果过滤申请人本人 → 命中模板覆盖的备用规则 → 系统默认递补链（主部门负责人 → ADMIN → ROOT）；仍无法解析**禁止提交**（「审批流程配置不完整，请联系管理员」），绝不静默跳过节点
+- **退回与重新提交**：审批人退回后申请人修改表单，**从第一个节点重新审批**（禁止从退回节点继续）；拒绝与退回必须填写原因
+- **转交**：仅系统管理员可转交（原审批人 TRANSFERRED_OUT、新审批人快照标记来源），写入 CRITICAL 级审计
+- **审批历史**：approval_actions 只追加，审批详情以业务语言展示流程（申请人 ✓ → 部门负责人 ●审批中 → 财务 ○等待），不暴露技术概念；审批附件走受控下载（认证 → 实例可见性 → 文件权限）
+
 **工程基建**
 
 - 统一 API 响应、统一异常处理、RequestId 全链路、结构化访问日志、Flyway 迁移、OpenAPI 文档
@@ -138,8 +154,7 @@ EasyOA 优先保证：
 
 ### Roadmap 中的能力（按阶段交付）
 
-审批流转（Phase 6）· 通知中心与全局搜索（Phase 7）·
-TOTP 与高危操作通道（Phase 8）· 数据洞察（Phase 9）
+通知中心与全局搜索（Phase 7）· TOTP 与高危操作通道（Phase 8）· 数据洞察（Phase 9）
 
 > 未交付的模块在界面中以**明确标注交付阶段**的空状态呈现，不会用假数据或假页面充数。
 
@@ -177,7 +192,8 @@ repository / dto` 分层；`v0.1.0` 不引入微服务、消息队列、Redis �
 | `project` | 项目生命周期、项目角色与成员、项目权限（Phase 3 已交付） |
 | `task` | 任务工作流、负责人体系、子任务、依赖与阻塞、看板与任务侧栏（Phase 4 已交付） |
 | `comment` / `file` | 评论（回复 / @ / 编辑历史 / 撤回）与附件（受控下载 / 元数据 / 上传策略）（Phase 5 已交付） |
-| `approval` / `notification` | 目录骨架已就位，按 Phase 6~7 交付 |
+| `approval` | 审批模板与版本、动态审批人、ANY_ONE / ALL、退回 / 转交 / 审批历史（Phase 6 已交付） |
+| `notification` | 目录骨架已就位，按 Phase 7 交付 |
 
 ---
 
@@ -353,7 +369,7 @@ EasyOA/
 | Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ✅ 已完成 |
 | Phase 4 | 任务：工作流、子任务、依赖与循环检测、看板、任务侧栏（**v0.1.0 重点**） | ✅ 已完成 |
 | Phase 5 | 评论与文件：回复 / @ / 编辑历史 / 撤回 / 受控下载 | ✅ 已完成 |
-| Phase 6 | 审批：模板版本、表单快照、ANY_ONE / ALL、动态与替补审批人 | ⏳ |
+| Phase 6 | 审批：模板版本、表单快照、ANY_ONE / ALL、动态与替补审批人 | ✅ 已完成 |
 | Phase 7 | 工作台：通知中心、全局搜索、命令面板检索、Activity Feed | ⏳ |
 | Phase 8 | 安全：TOTP、ROOT 高危操作通道、审计视图、安全设置 | ⏳ |
 | Phase 9 | 洞察：项目健康度、任务趋势、逾期与负载、审批效率 | ⏳ |

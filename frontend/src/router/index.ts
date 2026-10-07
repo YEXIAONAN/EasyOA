@@ -62,12 +62,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'approvals',
         name: 'approvals',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '审批',
-          phase: 'Phase 6',
-          summary: '审批模板、节点流转、动态审批人与审批历史将在 Phase 6 交付。',
-        },
+        component: () => import('@/views/ApprovalsView.vue'),
+        meta: { title: '审批' },
+      },
+      {
+        path: 'approvals/:id(\\d+)',
+        name: 'approval-detail',
+        component: () => import('@/views/ApprovalDetailView.vue'),
+        meta: { title: '审批详情' },
       },
       {
         path: 'team',

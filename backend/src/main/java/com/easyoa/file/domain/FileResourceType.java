@@ -9,5 +9,8 @@ public enum FileResourceType {
     TASK,
 
     /** 评论附件（resource_id = comment_id）。 */
-    COMMENT
+    COMMENT,
+
+    /** 审批附件（resource_id = instance_id；0 表示尚未提交的申请草稿附件）。 */
+    APPROVAL
 }

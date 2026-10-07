@@ -99,7 +99,13 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void resetSystemState() {
-        // 组织 / 项目 / 任务 / 评论数据使用原生 SQL 清理：自引用外键与级联关系无法通过实体逐行删除
+        // 组织 / 项目 / 任务 / 评论 / 审批数据使用原生 SQL 清理：自引用外键与级联关系无法通过实体逐行删除
+        jdbcTemplate.execute("delete from approval_actions");
+        jdbcTemplate.execute("delete from approval_node_approvers");
+        jdbcTemplate.execute("delete from approval_nodes");
+        jdbcTemplate.execute("delete from approval_instances");
+        jdbcTemplate.execute("delete from approval_template_versions");
+        jdbcTemplate.execute("delete from approval_templates");
         jdbcTemplate.execute("delete from files");
         jdbcTemplate.execute("delete from comment_mentions");
         jdbcTemplate.execute("delete from comment_versions");

@@ -71,7 +71,7 @@ const kpis = computed<KpiCard[]>(() => [
     key: 'approvals',
     label: '待我审批',
     value: summary.data.value?.kpis.pendingApprovals ?? 0,
-    hint: '审批模块 Phase 6 交付',
+    hint: '必须进入详情处理，不支持一键批准',
     icon: Stamp,
     routeName: 'approvals',
   },
@@ -202,12 +202,38 @@ function openTask(task: TaskCard): void {
       <div class="easy-card">
         <div class="easy-card__header">
           <span class="easy-card__title">待我审批</span>
+          <EasyButton
+            v-if="(summary.data.value?.pendingApprovals.length ?? 0) > 0"
+            size="sm"
+            @click="router.push({ name: 'approvals' })"
+          >
+            全部审批
+          </EasyButton>
+        </div>
+        <div v-if="(summary.data.value?.pendingApprovals.length ?? 0) > 0" class="approval-mini-list">
+          <button
+            v-for="approval in summary.data.value?.pendingApprovals ?? []"
+            :key="approval.id"
+            type="button"
+            class="approval-mini-item"
+            @click="router.push({ name: 'approval-detail', params: { id: String(approval.id) } })"
+          >
+            <div class="approval-mini-item__head">
+              <span class="approval-mini-item__title">{{ approval.title }}</span>
+              <span class="approval-mini-item__type">{{ approval.templateName }}</span>
+            </div>
+            <div class="approval-mini-item__meta">
+              <span>申请人：{{ approval.applicant.displayName }}</span>
+              <span v-if="approval.currentNodeName">当前节点：{{ approval.currentNodeName }}</span>
+              <span>{{ formatDateTime(approval.submittedAt ?? approval.createdAt) }}</span>
+            </div>
+          </button>
         </div>
         <EasyEmpty
+          v-else
           compact
           title="没有待处理的审批"
-          phase="Phase 6"
-          description="审批模块交付后，待办审批会在这里汇总；敏感审批必须进入详情页处理，不支持一键批准。"
+          description="待我审批的申请会在这里汇总；敏感审批必须进入详情页处理，不支持一键批准。"
         />
       </div>
     </section>
@@ -602,5 +628,63 @@ function openTask(task: TaskCard): void {
   display: flex;
   align-items: center;
   gap: var(--easy-space-3);
+}
+
+/* --- 待我审批区块（Phase 6 起为真实数据） ------------------------------------- */
+.approval-mini-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--easy-space-2);
+}
+
+.approval-mini-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-2);
+  padding: var(--easy-space-3);
+  border: none;
+  border-radius: var(--easy-radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--easy-transition-fast);
+}
+
+.approval-mini-item:hover {
+  background: var(--easy-surface-hover);
+}
+
+.approval-mini-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-2);
+  min-width: 0;
+}
+
+.approval-mini-item__title {
+  font-size: var(--easy-text-sm);
+  font-weight: 600;
+  color: var(--easy-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-mini-item__type {
+  flex: none;
+  font-size: var(--easy-text-xs);
+  color: var(--easy-brand-text);
+  background: var(--easy-brand-subtle);
+  border-radius: var(--easy-radius-full);
+  padding: 1px 8px;
+}
+
+.approval-mini-item__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+  flex-wrap: wrap;
 }
 </style>

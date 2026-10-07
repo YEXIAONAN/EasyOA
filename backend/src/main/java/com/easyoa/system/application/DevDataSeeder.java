@@ -14,6 +14,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.easyoa.approval.application.ApprovalSchemaCodec;
+import com.easyoa.approval.domain.ApprovalTemplate;
+import com.easyoa.approval.domain.ApprovalTemplateVersion;
+import com.easyoa.approval.domain.ApproverRuleType;
+import com.easyoa.approval.domain.NodeMode;
+import com.easyoa.approval.dto.ApproverRuleView;
+import com.easyoa.approval.dto.FormFieldView;
+import com.easyoa.approval.dto.NodeDefinitionView;
+import com.easyoa.approval.repository.ApprovalTemplateRepository;
+import com.easyoa.approval.repository.ApprovalTemplateVersionRepository;
 import com.easyoa.organization.domain.OrgMembership;
 import com.easyoa.organization.domain.OrgUnit;
 import com.easyoa.organization.domain.OrgUnitType;
@@ -70,6 +80,9 @@ public class DevDataSeeder implements ApplicationRunner {
     private final TaskDependencyRepository taskDependencyRepository;
     private final TaskCollaboratorRepository taskCollaboratorRepository;
     private final TaskStatusService taskStatusService;
+    private final ApprovalTemplateRepository approvalTemplateRepository;
+    private final ApprovalTemplateVersionRepository approvalTemplateVersionRepository;
+    private final ApprovalSchemaCodec approvalSchemaCodec;
     private final UserService userService;
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
@@ -79,6 +92,9 @@ public class DevDataSeeder implements ApplicationRunner {
             ProjectMemberRepository projectMemberRepository, TaskStatusRepository taskStatusRepository,
             TaskRepository taskRepository, TaskDependencyRepository taskDependencyRepository,
             TaskCollaboratorRepository taskCollaboratorRepository, TaskStatusService taskStatusService,
+            ApprovalTemplateRepository approvalTemplateRepository,
+            ApprovalTemplateVersionRepository approvalTemplateVersionRepository,
+            ApprovalSchemaCodec approvalSchemaCodec,
             UserService userService, SystemSettingService systemSettingService,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -91,6 +107,9 @@ public class DevDataSeeder implements ApplicationRunner {
         this.taskDependencyRepository = taskDependencyRepository;
         this.taskCollaboratorRepository = taskCollaboratorRepository;
         this.taskStatusService = taskStatusService;
+        this.approvalTemplateRepository = approvalTemplateRepository;
+        this.approvalTemplateVersionRepository = approvalTemplateVersionRepository;
+        this.approvalSchemaCodec = approvalSchemaCodec;
         this.userService = userService;
         this.systemSettingService = systemSettingService;
         this.passwordEncoder = passwordEncoder;
@@ -147,6 +166,9 @@ public class DevDataSeeder implements ApplicationRunner {
         // --- 演示任务（Phase 4：状态流 / 子任务 / 依赖 / 看板） ---------------------
         seedTasks(demo, root, admin, backend, frontend, product);
 
+        // --- 演示审批模板（Phase 6：动态审批人 / 自我审批禁止 / 多节点流转） ---------
+        seedApprovalTemplates(root);
+
         log.info("开发环境种子数据已写入：root / admin / member / kevin / linda，"
                 + "组织树：技术部（后端组 / 前端组）、产品部、Zero Lab，"
                 + "演示项目：EasyOA（OWNER=root，含演示任务与依赖）createdAt={}",
@@ -197,6 +219,50 @@ public class DevDataSeeder implements ApplicationRunner {
         // 前置依赖（未完成 → 看板卡片显示 BLOCKED）
         taskDependencyRepository.save(new TaskDependency(approval, taskModule, root.getId()));
         taskDependencyRepository.save(new TaskDependency(mobile, dataCenter, root.getId()));
+    }
+
+    /** 演示审批模板：请假申请（直属主管 → 管理员备案）与采购申请（直属主管 → 财务/管理员）。 */
+    private void seedApprovalTemplates(User root) {
+        if (approvalTemplateRepository.count() > 0) {
+            return;
+        }
+        // 请假申请
+        ApprovalTemplate leave = new ApprovalTemplate("请假申请",
+                "员工请假：直属主管审批 → 管理员备案（动态审批人 DIRECT_MANAGER）", root.getId());
+        approvalTemplateRepository.save(leave);
+        String leaveForm = approvalSchemaCodec.writeFormSchema(List.of(
+                new FormFieldView("reason", "请假事由", "TEXTAREA", true, null, null),
+                new FormFieldView("leaveType", "请假类型", "SELECT", true, List.of("事假", "病假", "年假"), null),
+                new FormFieldView("startDate", "开始日期", "DATE", true, null, null),
+                new FormFieldView("endDate", "结束日期", "DATE", true, null, null)));
+        String leaveNodes = approvalSchemaCodec.writeNodeSchema(List.of(
+                new NodeDefinitionView("直属主管审批", NodeMode.ANY_ONE,
+                        List.of(new ApproverRuleView(ApproverRuleType.DIRECT_MANAGER, null, null, null, null))),
+                new NodeDefinitionView("管理员备案", NodeMode.ANY_ONE,
+                        List.of(new ApproverRuleView(ApproverRuleType.SYSTEM_ROLE, null, "ADMIN", null, null)))));
+        publishSeededTemplate(leave, leaveForm, leaveNodes, root);
+
+        // 采购申请
+        ApprovalTemplate purchase = new ApprovalTemplate("采购申请",
+                "设备 / 物料采购：直属主管审批 → 管理员审批（含金额与用途）", root.getId());
+        approvalTemplateRepository.save(purchase);
+        String purchaseForm = approvalSchemaCodec.writeFormSchema(List.of(
+                new FormFieldView("item", "采购物品", "TEXT", true, null, null),
+                new FormFieldView("amount", "采购金额", "MONEY", true, null, null),
+                new FormFieldView("usage", "用途说明", "TEXTAREA", true, null, null)));
+        String purchaseNodes = approvalSchemaCodec.writeNodeSchema(List.of(
+                new NodeDefinitionView("直属主管审批", NodeMode.ANY_ONE,
+                        List.of(new ApproverRuleView(ApproverRuleType.DIRECT_MANAGER, null, null, null, null))),
+                new NodeDefinitionView("管理员审批", NodeMode.ANY_ONE,
+                        List.of(new ApproverRuleView(ApproverRuleType.SYSTEM_ROLE, null, "ADMIN", null, null)))));
+        publishSeededTemplate(purchase, purchaseForm, purchaseNodes, root);
+    }
+
+    private void publishSeededTemplate(ApprovalTemplate template, String formSchema, String nodeSchema, User actor) {
+        ApprovalTemplateVersion version = approvalTemplateVersionRepository.save(new ApprovalTemplateVersion(
+                template, 1, template.getName(), template.getDescription(), formSchema, nodeSchema, actor.getId()));
+        template.publishVersion(version.getVersionNo());
+        approvalTemplateRepository.save(template);
     }
 
     private TaskStatus statusOf(List<TaskStatus> statuses, TaskStatusType type) {

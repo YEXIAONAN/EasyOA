@@ -2,6 +2,7 @@ package com.easyoa.system.application;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +25,18 @@ import com.easyoa.project.domain.ProjectRole;
 import com.easyoa.project.domain.ProjectStatus;
 import com.easyoa.project.repository.ProjectMemberRepository;
 import com.easyoa.project.repository.ProjectRepository;
+import com.easyoa.task.application.TaskStatusService;
+import com.easyoa.task.domain.ProgressMode;
+import com.easyoa.task.domain.Task;
+import com.easyoa.task.domain.TaskCollaborator;
+import com.easyoa.task.domain.TaskDependency;
+import com.easyoa.task.domain.TaskPriority;
+import com.easyoa.task.domain.TaskStatus;
+import com.easyoa.task.domain.TaskStatusType;
+import com.easyoa.task.repository.TaskCollaboratorRepository;
+import com.easyoa.task.repository.TaskDependencyRepository;
+import com.easyoa.task.repository.TaskRepository;
+import com.easyoa.task.repository.TaskStatusRepository;
 import com.easyoa.user.application.UserService;
 import com.easyoa.user.domain.SystemRole;
 import com.easyoa.user.domain.User;
@@ -52,19 +65,32 @@ public class DevDataSeeder implements ApplicationRunner {
     private final OrgMembershipRepository orgMembershipRepository;
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final TaskStatusRepository taskStatusRepository;
+    private final TaskRepository taskRepository;
+    private final TaskDependencyRepository taskDependencyRepository;
+    private final TaskCollaboratorRepository taskCollaboratorRepository;
+    private final TaskStatusService taskStatusService;
     private final UserService userService;
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
 
     public DevDataSeeder(UserRepository userRepository, OrgUnitRepository orgUnitRepository,
             OrgMembershipRepository orgMembershipRepository, ProjectRepository projectRepository,
-            ProjectMemberRepository projectMemberRepository, UserService userService,
-            SystemSettingService systemSettingService, PasswordEncoder passwordEncoder) {
+            ProjectMemberRepository projectMemberRepository, TaskStatusRepository taskStatusRepository,
+            TaskRepository taskRepository, TaskDependencyRepository taskDependencyRepository,
+            TaskCollaboratorRepository taskCollaboratorRepository, TaskStatusService taskStatusService,
+            UserService userService, SystemSettingService systemSettingService,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.orgUnitRepository = orgUnitRepository;
         this.orgMembershipRepository = orgMembershipRepository;
         this.projectRepository = projectRepository;
         this.projectMemberRepository = projectMemberRepository;
+        this.taskStatusRepository = taskStatusRepository;
+        this.taskRepository = taskRepository;
+        this.taskDependencyRepository = taskDependencyRepository;
+        this.taskCollaboratorRepository = taskCollaboratorRepository;
+        this.taskStatusService = taskStatusService;
         this.userService = userService;
         this.systemSettingService = systemSettingService;
         this.passwordEncoder = passwordEncoder;
@@ -118,9 +144,92 @@ public class DevDataSeeder implements ApplicationRunner {
         projectMemberRepository.save(new ProjectMember(demo, frontend, ProjectRole.MEMBER));
         projectMemberRepository.save(new ProjectMember(demo, product, ProjectRole.MEMBER));
 
+        // --- 演示任务（Phase 4：状态流 / 子任务 / 依赖 / 看板） ---------------------
+        seedTasks(demo, root, admin, backend, frontend, product);
+
         log.info("开发环境种子数据已写入：root / admin / member / kevin / linda，"
-                + "组织树：技术部（后端组 / 前端组）、产品部、Zero Lab，演示项目：EasyOA（OWNER=root）createdAt={}",
+                + "组织树：技术部（后端组 / 前端组）、产品部、Zero Lab，"
+                + "演示项目：EasyOA（OWNER=root，含演示任务与依赖）createdAt={}",
                 Instant.now());
+    }
+
+    /** 演示任务：覆盖已完成 / 进行中 / 待审核 / 待处理、AUTO 进度子任务与依赖阻塞。 */
+    private void seedTasks(Project project, User root, User admin, User backend, User frontend, User product) {
+        taskStatusService.ensureDefaultStatuses(project);
+        List<TaskStatus> statuses = taskStatusRepository.findByProjectIdOrderBySortOrderAscIdAsc(project.getId());
+        TaskStatus todo = statusOf(statuses, TaskStatusType.TODO);
+        TaskStatus active = statusOf(statuses, TaskStatusType.ACTIVE);
+        TaskStatus review = statusOf(statuses, TaskStatusType.REVIEW);
+        TaskStatus done = statusOf(statuses, TaskStatusType.DONE);
+
+        Instant now = Instant.now();
+        seedTask(project, done, "账号、权限与安全审计", "Session 认证、CSRF、首次初始化与审计留痕。",
+                TaskPriority.HIGH, root, null, ProgressMode.MANUAL, 100,
+                now.minus(20, ChronoUnit.DAYS), now.minus(4, ChronoUnit.DAYS), root);
+        seedTask(project, done, "组织架构与成员目录", "组织树、多组织归属与成员档案。",
+                TaskPriority.MEDIUM, backend, admin, ProgressMode.MANUAL, 100,
+                now.minus(18, ChronoUnit.DAYS), now.minus(6, ChronoUnit.DAYS), root);
+        seedTask(project, active, "项目协作与工作台", "项目生命周期、角色权限与工作台聚合。",
+                TaskPriority.HIGH, admin, root, ProgressMode.MANUAL, 70,
+                now.minus(12, ChronoUnit.DAYS), now.plus(5, ChronoUnit.DAYS), root);
+
+        Task taskModule = seedTask(project, active, "任务执行模块（看板与依赖）",
+                "任务状态流、子任务、依赖阻塞与看板拖拽。",
+                TaskPriority.URGENT, backend, null, ProgressMode.AUTO, 33,
+                now.minus(3, ChronoUnit.DAYS), now.plus(12, ChronoUnit.DAYS), root);
+        // AUTO 模式子任务（1/3 完成 → 进度 33%）
+        seedSubtask(project, taskModule, done, "V4 数据模型与迁移", backend, root);
+        seedSubtask(project, taskModule, active, "状态流与依赖阻塞", frontend, root);
+        seedSubtask(project, taskModule, todo, "看板拖拽与任务侧栏", frontend, root);
+
+        Task dataCenter = seedTask(project, review, "数据中心与统计看板", "项目健康度、任务趋势与成员负载。",
+                TaskPriority.MEDIUM, frontend, null, ProgressMode.MANUAL, 90,
+                now.minus(5, ChronoUnit.DAYS), now.plus(2, ChronoUnit.DAYS), root);
+        // 协作成员示例：root 以协作成员身份参与（「我的任务」跨角色聚合）
+        taskCollaboratorRepository.save(new TaskCollaborator(dataCenter, root));
+        Task approval = seedTask(project, todo, "审批与公文流转", "审批模板、节点流转与历史。",
+                TaskPriority.HIGH, product, null, ProgressMode.MANUAL, 0,
+                now.plus(10, ChronoUnit.DAYS), now.plus(30, ChronoUnit.DAYS), root);
+        Task mobile = seedTask(project, todo, "移动端适配调研", "响应式布局与移动端交互调研。",
+                TaskPriority.LOW, product, null, ProgressMode.MANUAL, 0,
+                now.plus(14, ChronoUnit.DAYS), now.plus(21, ChronoUnit.DAYS), root);
+
+        // 前置依赖（未完成 → 看板卡片显示 BLOCKED）
+        taskDependencyRepository.save(new TaskDependency(approval, taskModule, root.getId()));
+        taskDependencyRepository.save(new TaskDependency(mobile, dataCenter, root.getId()));
+    }
+
+    private TaskStatus statusOf(List<TaskStatus> statuses, TaskStatusType type) {
+        return statuses.stream()
+                .filter(status -> status.getSystemType() == type)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("缺少默认任务状态：" + type));
+    }
+
+    private Task seedTask(Project project, TaskStatus status, String title, String description,
+            TaskPriority priority, User primary, User deputy, ProgressMode mode, int progress,
+            Instant plannedStart, Instant plannedEnd, User actor) {
+        Task task = new Task(project, null, status, title, primary, actor.getId());
+        task.updateInfo(title, description, priority, plannedStart, plannedEnd);
+        task.changeProgressMode(mode);
+        task.changeProgress(progress);
+        if (deputy != null) {
+            task.changeAssignees(primary, deputy);
+        }
+        if (status.getSystemType() == TaskStatusType.ACTIVE || status.getSystemType() == TaskStatusType.DONE) {
+            // 自动记录 actual_start_at / completed_at
+            task.changeStatus(status, Instant.now());
+        }
+        return taskRepository.save(task);
+    }
+
+    private void seedSubtask(Project project, Task parent, TaskStatus status, String title, User primary, User actor) {
+        Task subtask = new Task(project, parent, status, title, primary, actor.getId());
+        subtask.updateInfo(title, null, TaskPriority.MEDIUM, null, parent.getPlannedEndAt());
+        if (status.getSystemType() == TaskStatusType.ACTIVE || status.getSystemType() == TaskStatusType.DONE) {
+            subtask.changeStatus(status, Instant.now());
+        }
+        taskRepository.save(subtask);
     }
 
     private User createUser(String username, String displayName, String jobTitle, SystemRole role) {

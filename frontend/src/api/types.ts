@@ -68,6 +68,8 @@ export interface WorkspaceSummary {
     activeProjects: number
     dueSoonTasks: number
   }
+  /** 「我的任务」区块（Phase 4 起为真实数据） */
+  myTasks: TaskCard[]
   /** 当前用户参与的项目（工作台「项目进度」区块，Phase 3 起为真实数据） */
   projectProgress: ProjectCard[]
 }
@@ -279,4 +281,131 @@ export interface UpdateMyProfilePayload {
   phone?: string
   bio?: string
   avatarUrl?: string
+}
+
+// ---------------------------------------------------------------------------
+// 任务执行（Phase 4）
+// ---------------------------------------------------------------------------
+
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+/** 系统统一类型：项目可自定义状态名称，但必须映射到这里（统计不依赖自定义名称） */
+export type TaskStatusType = 'TODO' | 'ACTIVE' | 'REVIEW' | 'DONE' | 'CLOSED'
+export type ProgressMode = 'MANUAL' | 'AUTO'
+export type AssignmentState = 'ACTIVE' | 'PENDING_ASSIGNMENT' | 'REJECTED'
+
+export interface TaskUserBrief {
+  id: number
+  username: string
+  displayName: string
+  avatarUrl?: string | null
+  jobTitle?: string | null
+}
+
+export interface TaskStatusView {
+  id: number
+  name: string
+  systemType: TaskStatusType
+  sortOrder: number
+}
+
+/** 任务卡片：看板 / 任务列表 / 我的任务 / 子任务列表共用 */
+export interface TaskCard {
+  id: number
+  projectId: number
+  projectName: string
+  parentId?: number | null
+  title: string
+  priority: TaskPriority
+  status: TaskStatusView
+  primaryAssignee: TaskUserBrief
+  deputyAssignee?: TaskUserBrief | null
+  progress: number
+  progressMode: ProgressMode
+  plannedStartAt?: string | null
+  plannedEndAt?: string | null
+  completedAt?: string | null
+  blocked: boolean
+  blockerCount: number
+  overdue: boolean
+  canManage: boolean
+  canFullControl: boolean
+  updatedAt: string
+}
+
+export interface TaskDependencyView {
+  id: number
+  dependsOnTaskId: number
+  title: string
+  statusName: string
+  statusType: TaskStatusType
+  finished: boolean
+  primaryAssignee?: TaskUserBrief | null
+}
+
+export interface TaskDetailPermissions {
+  canManage: boolean
+  canFullControl: boolean
+  canEditProgress: boolean
+  canManageDependencies: boolean
+  canManageCollaborators: boolean
+  canReviewAssignment: boolean
+}
+
+export interface TaskDetail {
+  id: number
+  projectId: number
+  projectName: string
+  parentId?: number | null
+  parentTitle?: string | null
+  title: string
+  description?: string | null
+  priority: TaskPriority
+  status: TaskStatusView
+  primaryAssignee: TaskUserBrief
+  deputyAssignee?: TaskUserBrief | null
+  collaborators: TaskUserBrief[]
+  progress: number
+  progressMode: ProgressMode
+  plannedStartAt?: string | null
+  plannedEndAt?: string | null
+  actualStartAt?: string | null
+  completedAt?: string | null
+  assignmentState: AssignmentState
+  blocked: boolean
+  blockerCount: number
+  dependencies: TaskDependencyView[]
+  subtasks: TaskCard[]
+  createdAt: string
+  updatedAt: string
+  permissions: TaskDetailPermissions
+}
+
+export interface TaskBoard {
+  projectId: number
+  statuses: TaskStatusView[]
+  tasks: TaskCard[]
+  /** 待派发审核任务（仅项目负责人可见，成员看到空数组） */
+  pendingAssignments: TaskCard[]
+}
+
+export interface CreateTaskPayload {
+  title: string
+  description?: string
+  primaryAssigneeId?: number | null
+  deputyAssigneeId?: number | null
+  collaboratorUserIds?: number[]
+  priority?: TaskPriority
+  statusId?: number | null
+  plannedStartAt?: string
+  plannedEndAt?: string
+  progressMode?: ProgressMode
+}
+
+export interface UpdateTaskPayload {
+  title: string
+  description?: string
+  priority?: TaskPriority
+  plannedStartAt?: string
+  plannedEndAt?: string
+  progressMode?: ProgressMode
 }

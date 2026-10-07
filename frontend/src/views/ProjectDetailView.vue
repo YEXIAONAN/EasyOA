@@ -1,32 +1,50 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Search } from '@element-plus/icons-vue'
 
 import { ApiError } from '@/api/errors'
+import type { PageResult } from '@/api/client'
 import { projectApi } from '@/api/modules/projects'
+import { taskApi } from '@/api/modules/tasks'
 import { userApi } from '@/api/modules/users'
-import type { ProjectDetail, ProjectMemberView, ProjectStatus } from '@/api/types'
+import type {
+  ProjectDetail,
+  ProjectMemberView,
+  ProjectStatus,
+  TaskCard,
+  TaskPriority,
+  TaskStatusType,
+  TaskStatusView,
+} from '@/api/types'
 import EasyAvatar from '@/components/easy/EasyAvatar.vue'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyEmpty from '@/components/easy/EasyEmpty.vue'
 import EasyInput from '@/components/easy/EasyInput.vue'
 import EasySelect from '@/components/easy/EasySelect.vue'
 import EasyStatus from '@/components/easy/EasyStatus.vue'
+import TaskBlockedDialog from '@/components/task/TaskBlockedDialog.vue'
+import TaskBoard from '@/components/task/TaskBoard.vue'
+import TaskCreateDialog from '@/components/task/TaskCreateDialog.vue'
+import TaskDetailDrawer from '@/components/task/TaskDetailDrawer.vue'
 import { confirmAction } from '@/components/easy/easyConfirm'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { formatDate, formatDateTime, toDateInputValue, toIsoInstant } from '@/utils/format'
 import { projectRoleLabel, projectRoleTone, projectStatusLabel, projectStatusTone } from '@/utils/project'
+import { taskPriorityLabel, taskPriorityTone, taskStatusTypeTone } from '@/utils/task'
 
 /**
  * 项目详情页（工作区）。
  *
  * Tab：概览 / 看板 / 任务 / 时间线 / 成员 / 设置
- * - 概览、成员、设置 在 Phase 3 交付；
- * - 看板 / 任务 / 时间线依赖任务模块（Phase 4），以明确标注交付阶段的空状态呈现。
+ * - 概览、成员、设置在 Phase 3 交付；
+ * - 看板（拖拽 + 依赖阻塞）、任务列表、任务详情右侧 Drawer 在 Phase 4 交付；
+ * - 时间线留待后续版本。
  *
- * Tab 状态与 URL query 同步（刷新后仍停留在同一 Tab）。
+ * URL 同步：
+ * - Tab：看板使用 /projects/:id/board，其余 Tab 使用 ?tab=xxx；
+ * - 任务详情：?task=<taskId>（刷新后仍打开对应任务）。
  */
 const route = useRoute()
 const router = useRouter()
@@ -41,6 +59,7 @@ const loadError = ref<string | null>(null)
 const tabs = ['overview', 'board', 'tasks', 'timeline', 'members', 'settings'] as const
 type TabName = (typeof tabs)[number]
 const activeTab = ref<TabName>('overview')
+const BOARD_ROUTE = 'project-board'
 
 /** 前端镜像的生命周期流转表（仅用于展示按钮，后端会再次校验） */
 const TRANSITIONS: Record<ProjectStatus, ProjectStatus[]> = {
@@ -61,6 +80,7 @@ async function load(): Promise<void> {
   try {
     detail.value = await projectApi.detail(projectId.value)
     syncInfoForm()
+    void loadTaskOverview()
   } catch (error) {
     loadError.value = error instanceof ApiError ? error.message : '项目加载失败'
   } finally {
@@ -68,28 +88,44 @@ async function load(): Promise<void> {
   }
 }
 
-function readTabFromQuery(): void {
+function readTabFromRoute(): void {
+  if (route.name === BOARD_ROUTE) {
+    activeTab.value = 'board'
+    return
+  }
   const tab = route.query.tab
-  activeTab.value = typeof tab === 'string' && (tabs as readonly string[]).includes(tab)
-    ? (tab as TabName)
-    : 'overview'
+  activeTab.value =
+    typeof tab === 'string' && (tabs as readonly string[]).includes(tab) ? (tab as TabName) : 'overview'
+}
+
+/** Tab → URL（看板使用 /projects/:id/board，其余使用 ?tab=xxx，保留 task 深链参数） */
+function syncRoute(tab: TabName): void {
+  if (!detail.value) return
+  const id = String(projectId.value)
+  if (tab === 'board') {
+    if (route.name !== BOARD_ROUTE) {
+      const query = { ...route.query }
+      delete query.tab
+      void router.replace({ name: BOARD_ROUTE, params: { id }, query })
+    }
+    return
+  }
+  if (route.name === BOARD_ROUTE || route.query.tab !== tab) {
+    void router.replace({ name: 'project-detail', params: { id }, query: { ...route.query, tab } })
+  }
 }
 
 onMounted(() => {
-  readTabFromQuery()
+  readTabFromRoute()
   void load()
 })
 
 watch(
-  () => route.query.tab,
-  () => readTabFromQuery(),
+  () => [route.name, route.query.tab],
+  () => readTabFromRoute(),
 )
 
-watch(activeTab, (tab) => {
-  if (route.query.tab !== tab) {
-    void router.replace({ query: { ...route.query, tab } })
-  }
-})
+watch(activeTab, (tab) => syncRoute(tab))
 
 // --- 概览：进度 -------------------------------------------------------------
 const progressInput = ref<number>(0)
@@ -107,6 +143,33 @@ async function saveProgress(): Promise<void> {
     savingProgress.value = false
   }
 }
+
+// --- 概览：任务统计（Phase 4） ------------------------------------------------
+const taskStats = ref<{ total: number; byType: Record<TaskStatusType, number>; overdue: number; blocked: number } | null>(null)
+
+async function loadTaskOverview(): Promise<void> {
+  try {
+    const page = await taskApi.list(projectId.value, { size: 100 })
+    const byType: Record<TaskStatusType, number> = { TODO: 0, ACTIVE: 0, REVIEW: 0, DONE: 0, CLOSED: 0 }
+    let overdue = 0
+    let blocked = 0
+    for (const task of page.items) {
+      byType[task.status.systemType] += 1
+      if (task.overdue) overdue += 1
+      if (task.blocked) blocked += 1
+    }
+    taskStats.value = { total: page.total, byType, overdue, blocked }
+  } catch {
+    // 概览统计失败不影响主流程（看板与任务 Tab 会给出明确错误）
+    taskStats.value = null
+  }
+}
+
+const doneRatio = computed(() => {
+  if (!taskStats.value || taskStats.value.total === 0) return 0
+  const finished = taskStats.value.byType.DONE + taskStats.value.byType.CLOSED
+  return Math.round((finished * 100) / taskStats.value.total)
+})
 
 // --- 设置：基本信息 ---------------------------------------------------------
 const infoForm = reactive({ name: '', description: '', plannedStartAt: '', plannedEndAt: '' })
@@ -157,7 +220,7 @@ async function archiveProject(): Promise<void> {
   if (!detail.value) return
   const confirmed = await confirmAction({
     title: '归档项目',
-    message: `归档后「${detail.value.name}」将变为只读：项目信息、成员与状态都不能再修改；已归档项目仍会保留在列表中（带「已归档」标记），历史记录与审计保持完整。确定归档吗？`,
+    message: `归档后「${detail.value.name}」将变为只读：项目信息、成员、任务与状态都不能再修改；已归档项目仍会保留在列表中（带「已归档」标记），历史记录与审计保持完整。确定归档吗？`,
     confirmText: '归档',
     danger: true,
   })
@@ -256,8 +319,122 @@ async function transferOwner(member: ProjectMemberView): Promise<void> {
   }
 }
 
+// --- 看板（Phase 4） ---------------------------------------------------------
+const boardRef = ref<InstanceType<typeof TaskBoard> | null>(null)
+const drawerRef = ref<InstanceType<typeof TaskDetailDrawer> | null>(null)
+const createOpen = ref(false)
+
 const isArchived = computed(() => detail.value?.status === 'ARCHIVED')
 const myUserId = computed(() => auth.user?.id)
+const canCreateTask = computed(() => detail.value?.myRole != null && !isArchived.value)
+const canManageStatuses = computed(() => {
+  const role = detail.value?.myRole
+  return (role === 'OWNER' || role === 'DEPUTY_OWNER') && !isArchived.value
+})
+
+/** 任务详情深链：?task=<id>（刷新后仍然打开） */
+const openTaskId = computed(() => {
+  const raw = route.query.task
+  const value = Array.isArray(raw) ? raw[0] : raw
+  const parsed = value ? Number(value) : null
+  return parsed && !Number.isNaN(parsed) ? parsed : null
+})
+
+function openTask(taskId: number): void {
+  if (openTaskId.value === taskId) return
+  void router.push({ query: { ...route.query, task: String(taskId) } })
+}
+
+function closeTask(): void {
+  const query = { ...route.query }
+  delete query.task
+  void router.replace({ query })
+}
+
+function onTaskChanged(): void {
+  boardRef.value?.load()
+  void loadTaskOverview()
+  if (taskPage.value) void loadTaskList()
+}
+
+// 依赖阻塞：看板拖拽或侧栏切换被拒后，统一弹出「忽略依赖并开始」
+const blockedDialog = reactive({ open: false, taskId: null as number | null, statusId: null as number | null, statusName: '' })
+
+function handleBlockedTransition(payload: { taskId: number; statusId: number; statusName: string }): void {
+  blockedDialog.taskId = payload.taskId
+  blockedDialog.statusId = payload.statusId
+  blockedDialog.statusName = payload.statusName
+  blockedDialog.open = true
+}
+
+function onOverrideDone(): void {
+  boardRef.value?.load()
+  drawerRef.value?.reload()
+  void loadTaskOverview()
+  if (taskPage.value) void loadTaskList()
+}
+
+function onTaskCreated(): void {
+  boardRef.value?.load()
+  void loadTaskOverview()
+  if (activeTab.value === 'tasks') void loadTaskList()
+}
+
+// --- 任务列表（Phase 4） ------------------------------------------------------
+const taskStatuses = ref<TaskStatusView[]>([])
+const taskPage = ref<PageResult<TaskCard> | null>(null)
+const taskListLoading = ref(false)
+const taskListError = ref<string | null>(null)
+const taskFilters = reactive({
+  keyword: '',
+  statusId: null as number | null,
+  priority: null as TaskPriority | null,
+  page: 1,
+  size: 15,
+})
+
+const taskStatusOptions = computed(() => taskStatuses.value.map((status) => ({ label: status.name, value: status.id })))
+const taskPriorityOptions = [
+  { label: '低', value: 'LOW' },
+  { label: '中', value: 'MEDIUM' },
+  { label: '高', value: 'HIGH' },
+  { label: '紧急', value: 'URGENT' },
+]
+
+async function loadTaskList(): Promise<void> {
+  taskListLoading.value = true
+  taskListError.value = null
+  try {
+    if (taskStatuses.value.length === 0) {
+      taskStatuses.value = await taskApi.statuses(projectId.value)
+    }
+    taskPage.value = await taskApi.list(projectId.value, {
+      keyword: taskFilters.keyword.trim() || undefined,
+      statusId: taskFilters.statusId,
+      priority: taskFilters.priority,
+      page: taskFilters.page,
+      size: taskFilters.size,
+    })
+  } catch (error) {
+    taskListError.value = error instanceof ApiError ? error.message : '任务加载失败'
+  } finally {
+    taskListLoading.value = false
+  }
+}
+
+function searchTasks(): void {
+  taskFilters.page = 1
+  void loadTaskList()
+}
+
+function changeTaskPage(next: number): void {
+  taskFilters.page = next
+  void loadTaskList()
+}
+
+watch(activeTab, (tab) => {
+  if (tab === 'tasks') void loadTaskList()
+})
 </script>
 
 <template>
@@ -378,10 +555,57 @@ const myUserId = computed(() => auth.user?.id)
                     <EasyButton size="sm" :loading="savingProgress" @click="saveProgress">保存进度</EasyButton>
                   </div>
                   <p v-else class="easy-text-xs easy-muted">
-                    进度由项目负责人维护；Phase 4 起可按任务完成情况自动汇总。
+                    进度由项目负责人 / 副负责人维护。
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div class="easy-card">
+              <div class="easy-card__header">
+                <span class="easy-card__title">任务概览</span>
+                <EasyButton size="sm" @click="activeTab = 'board'">打开看板</EasyButton>
+              </div>
+              <div v-if="taskStats && taskStats.total > 0" class="easy-card__body task-stats">
+                <div class="task-stats__kpis">
+                  <div class="stat-item">
+                    <span class="stat-item__label">任务总数</span>
+                    <span class="stat-item__value">{{ taskStats.total }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-item__label">已完成</span>
+                    <span class="stat-item__value stat-item__value--success">{{ taskStats.byType.DONE }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-item__label">进行中</span>
+                    <span class="stat-item__value stat-item__value--brand">{{ taskStats.byType.ACTIVE }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-item__label">阻塞</span>
+                    <span class="stat-item__value stat-item__value--warning">{{ taskStats.blocked }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-item__label">已逾期</span>
+                    <span class="stat-item__value stat-item__value--danger">{{ taskStats.overdue }}</span>
+                  </div>
+                </div>
+                <div class="task-stats__completion">
+                  <div class="progress progress--lg">
+                    <div class="progress__bar" :style="{ width: `${doneRatio}%` }" />
+                  </div>
+                  <span class="progress__value">{{ doneRatio }}%（已完成 / 已关闭占比，按系统状态类型统计）</span>
+                </div>
+              </div>
+              <EasyEmpty
+                v-else
+                compact
+                title="还没有任务"
+                description="在看板中创建第一个任务：支持主/副负责人、协作成员、子任务、依赖与进度自动计算。"
+              >
+                <template #action>
+                  <EasyButton size="sm" variant="primary" @click="activeTab = 'board'">去创建任务</EasyButton>
+                </template>
+              </EasyEmpty>
             </div>
 
             <div class="easy-card">
@@ -397,36 +621,101 @@ const myUserId = computed(() => auth.user?.id)
                 </span>
               </div>
             </div>
-
-            <div class="easy-card">
-              <div class="easy-card__header"><span class="easy-card__title">任务概览</span></div>
-              <EasyEmpty
-                compact
-                title="任务模块尚未交付"
-                phase="Phase 4"
-                description="任务工作流、子任务、依赖、看板与任务侧栏将在 Phase 4 交付，届时这里会显示任务统计与逾期提醒。"
-              />
-            </div>
           </div>
         </el-tab-pane>
 
-        <!-- 看板 / 任务 / 时间线：Phase 4 -->
+        <!-- 看板 -->
         <el-tab-pane label="看板" name="board">
-          <div class="easy-card">
-            <EasyEmpty
-              title="看板将在 Phase 4 交付"
-              phase="Phase 4"
-              description="支持按状态拖拽任务卡片、依赖阻塞提示与「忽略依赖并开始」的完整流程。"
-            />
-          </div>
+          <TaskBoard
+            ref="boardRef"
+            :project-id="projectId"
+            :can-create-task="canCreateTask"
+            :can-manage-statuses="canManageStatuses"
+            @open-task="openTask"
+            @create-task="createOpen = true"
+            @blocked-transition="handleBlockedTransition"
+          />
         </el-tab-pane>
 
+        <!-- 任务列表 -->
         <el-tab-pane label="任务" name="tasks">
-          <div class="easy-card">
+          <div class="easy-card task-panel">
+            <div class="task-panel__filters">
+              <EasyInput v-model="taskFilters.keyword" placeholder="搜索任务标题 / 描述" @keyup.enter="searchTasks">
+                <template #prefix><el-icon><Search /></el-icon></template>
+              </EasyInput>
+              <EasySelect
+                v-model="taskFilters.statusId"
+                :options="taskStatusOptions"
+                placeholder="全部状态"
+                class="task-panel__filter"
+              />
+              <EasySelect
+                v-model="taskFilters.priority"
+                :options="taskPriorityOptions"
+                placeholder="全部优先级"
+                class="task-panel__filter"
+              />
+              <EasyButton size="sm" @click="searchTasks">筛选</EasyButton>
+              <EasyButton v-if="canCreateTask" variant="primary" size="sm" @click="createOpen = true">
+                新建任务
+              </EasyButton>
+            </div>
+
+            <div v-if="taskListError" class="task-panel__error">
+              <span>{{ taskListError }}</span>
+              <EasyButton size="sm" @click="loadTaskList">重试</EasyButton>
+            </div>
+
+            <div v-else-if="taskListLoading && !taskPage" class="task-panel__hint">正在加载任务…</div>
+
+            <template v-else-if="taskPage && taskPage.items.length > 0">
+              <ul class="task-table">
+                <li
+                  v-for="task in taskPage.items"
+                  :key="task.id"
+                  class="task-table__row"
+                  @click="openTask(task.id)"
+                >
+                  <div class="task-table__main">
+                    <span class="task-table__title">{{ task.title }}</span>
+                    <span class="task-table__sub">
+                      主负责人：{{ task.primaryAssignee.displayName }}
+                      <span v-if="task.deputyAssignee">· 副负责人：{{ task.deputyAssignee.displayName }}</span>
+                    </span>
+                  </div>
+                  <span v-if="task.blocked" class="task-table__blocked">阻塞 {{ task.blockerCount }}</span>
+                  <div class="task-table__progress">
+                    <div class="progress">
+                      <div class="progress__bar" :style="{ width: `${task.progress}%` }" />
+                    </div>
+                    <span class="progress__value">{{ task.progress }}%</span>
+                  </div>
+                  <EasyStatus :label="task.status.name" :tone="taskStatusTypeTone(task.status.systemType)" />
+                  <EasyStatus :label="taskPriorityLabel(task.priority)" :tone="taskPriorityTone(task.priority)" />
+                  <span class="task-table__due" :class="{ 'task-table__due--overdue': task.overdue }">
+                    {{ formatDate(task.plannedEndAt) }}
+                  </span>
+                </li>
+              </ul>
+
+              <div v-if="taskPage.total > taskFilters.size" class="pagination">
+                <el-pagination
+                  layout="prev, pager, next"
+                  :total="taskPage.total"
+                  :page-size="taskFilters.size"
+                  :current-page="taskFilters.page"
+                  background
+                  @current-change="changeTaskPage"
+                />
+              </div>
+            </template>
+
             <EasyEmpty
-              title="任务列表将在 Phase 4 交付"
-              phase="Phase 4"
-              description="任务列表、筛选、子任务、依赖与协作成员将在 Phase 4 交付。"
+              v-else
+              compact
+              title="没有符合条件的任务"
+              description="尝试调整筛选条件，或在看板中创建新任务。"
             />
           </div>
         </el-tab-pane>
@@ -434,9 +723,9 @@ const myUserId = computed(() => auth.user?.id)
         <el-tab-pane label="时间线" name="timeline">
           <div class="easy-card">
             <EasyEmpty
-              title="时间线将在 Phase 4 交付"
-              phase="Phase 4"
-              description="基于任务计划与实际时间生成的甘特式时间线将在 Phase 4 交付。"
+              title="时间线将在后续版本交付"
+              phase="Phase 7"
+              description="基于任务计划与实际时间的甘特式时间线将随工作台阶段交付。"
             />
           </div>
         </el-tab-pane>
@@ -590,6 +879,37 @@ const myUserId = computed(() => auth.user?.id)
           </div>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 新建任务 -->
+      <TaskCreateDialog
+        v-model="createOpen"
+        :project-id="projectId"
+        :members="detail.members"
+        @created="onTaskCreated"
+      />
+
+      <!-- 任务详情（右侧 Drawer，URL 同步 ?task=<id>） -->
+      <TaskDetailDrawer
+        v-if="openTaskId"
+        ref="drawerRef"
+        :key="openTaskId"
+        :task-id="openTaskId"
+        :project-id="projectId"
+        :members="detail.members"
+        @close="closeTask"
+        @changed="onTaskChanged"
+        @open-task="openTask"
+        @blocked-transition="handleBlockedTransition"
+      />
+
+      <!-- 忽略依赖并开始 -->
+      <TaskBlockedDialog
+        v-model="blockedDialog.open"
+        :task-id="blockedDialog.taskId"
+        :status-id="blockedDialog.statusId"
+        :status-name="blockedDialog.statusName"
+        @done="onOverrideDone"
+      />
     </template>
   </div>
 </template>
@@ -930,5 +1250,179 @@ const myUserId = computed(() => auth.user?.id)
   display: flex;
   flex-direction: column;
   gap: var(--easy-space-3);
+}
+
+/* --- 任务概览（Phase 4） ------------------------------------------------------ */
+.task-stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-4);
+}
+
+.task-stats__kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--easy-space-3);
+}
+
+@media (max-width: 900px) {
+  .task-stats__kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-item__label {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+}
+
+.stat-item__value {
+  font-size: var(--easy-text-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-item__value--success {
+  color: var(--easy-success);
+}
+
+.stat-item__value--brand {
+  color: var(--easy-brand-text);
+}
+
+.stat-item__value--warning {
+  color: var(--easy-warning);
+}
+
+.stat-item__value--danger {
+  color: var(--easy-danger);
+}
+
+.task-stats__completion {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+}
+
+/* --- 任务列表（Phase 4） ------------------------------------------------------ */
+.task-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-4);
+  padding: var(--easy-space-4) var(--easy-space-5);
+}
+
+.task-panel__filters {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+  flex-wrap: wrap;
+}
+
+.task-panel__filters > :first-child {
+  width: 260px;
+}
+
+.task-panel__filter {
+  width: 160px;
+}
+
+.task-panel__error,
+.task-panel__hint {
+  color: var(--easy-danger);
+  font-size: var(--easy-text-sm);
+  padding: var(--easy-space-2) 0;
+}
+
+.task-panel__hint {
+  color: var(--easy-text-3);
+}
+
+.task-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-table__row {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-4);
+  padding: var(--easy-space-3) 0;
+  border-bottom: 1px solid var(--easy-border);
+  cursor: pointer;
+}
+
+.task-table__row:last-child {
+  border-bottom: none;
+}
+
+.task-table__row:hover .task-table__title {
+  color: var(--easy-brand-text);
+}
+
+.task-table__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-table__title {
+  font-size: var(--easy-text-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-table__sub {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+}
+
+.task-table__blocked {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-warning);
+  flex: none;
+}
+
+.task-table__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-2);
+  width: 120px;
+  flex: none;
+}
+
+.task-table__progress .progress {
+  flex: 1;
+  width: auto;
+  height: 4px;
+}
+
+.task-table__due {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+  width: 84px;
+  text-align: right;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-table__due--overdue {
+  color: var(--easy-danger);
+  font-weight: 600;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
 }
 </style>

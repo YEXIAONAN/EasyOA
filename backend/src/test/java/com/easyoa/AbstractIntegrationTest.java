@@ -99,7 +99,11 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void resetSystemState() {
-        // 组织 / 项目数据使用原生 SQL 清理：自引用外键与级联关系无法通过实体逐行删除
+        // 组织 / 项目 / 任务数据使用原生 SQL 清理：自引用外键与级联关系无法通过实体逐行删除
+        jdbcTemplate.execute("delete from task_dependencies");
+        jdbcTemplate.execute("delete from task_collaborators");
+        jdbcTemplate.execute("delete from tasks");
+        jdbcTemplate.execute("delete from task_statuses");
         jdbcTemplate.execute("delete from project_members");
         jdbcTemplate.execute("delete from projects");
         jdbcTemplate.execute("delete from user_org_memberships");

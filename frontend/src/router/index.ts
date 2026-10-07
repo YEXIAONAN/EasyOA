@@ -47,14 +47,17 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '项目详情' },
       },
       {
+        // 看板使用独立路径（/projects/12/board?task=86），支持任务深链与刷新保持
+        path: 'projects/:id(\\d+)/board',
+        name: 'project-board',
+        component: () => import('@/views/ProjectDetailView.vue'),
+        meta: { title: '项目看板' },
+      },
+      {
         path: 'my-tasks',
         name: 'my-tasks',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '我的任务',
-          phase: 'Phase 4',
-          summary: '任务工作流、子任务、依赖、看板与任务详情侧栏将在 Phase 4 交付。',
-        },
+        component: () => import('@/views/MyTasksView.vue'),
+        meta: { title: '我的任务' },
       },
       {
         path: 'approvals',

@@ -6,13 +6,15 @@ import type { Component } from 'vue'
 
 import { authApi } from '@/api/modules/auth'
 import { workspaceApi } from '@/api/modules/workspace'
+import type { TaskCard } from '@/api/types'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyEmpty from '@/components/easy/EasyEmpty.vue'
 import EasyStatus from '@/components/easy/EasyStatus.vue'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
-import { formatDateTime, formatRelative, greeting } from '@/utils/format'
+import { formatDate, formatDateTime, formatRelative, greeting } from '@/utils/format'
 import { projectRoleLabel, projectStatusLabel, projectStatusTone } from '@/utils/project'
+import { taskPriorityLabel, taskPriorityTone, taskStatusTypeTone } from '@/utils/task'
 
 /**
  * 工作台首页：回答三个问题 ——
@@ -20,8 +22,8 @@ import { projectRoleLabel, projectStatusLabel, projectStatusTone } from '@/utils
  *   2. 什么事情正在等我（待我审批）
  *   3. 我的项目发生了什么（项目动态 / 项目进度）
  *
- * Phase 1 说明：项目 / 任务 / 审批模块尚未交付，对应区块以空状态呈现真实进度，
- * 不展示任何假数据；账号与安全信息为真实数据。
+ * 任务相关区域（Phase 4 起）与项目区域（Phase 3 起）为真实数据；
+ * 审批（Phase 6）与 Activity Feed（Phase 7）以明确标注交付阶段的空状态呈现，不展示假数据。
  */
 const router = useRouter()
 const auth = useAuthStore()
@@ -39,6 +41,11 @@ const today = computed(() =>
   new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full' }).format(new Date()),
 )
 
+const openTaskCount = computed(() => summary.data.value?.kpis.myOpenTasks ?? 0)
+const taskBrief = computed(() =>
+  openTaskCount.value > 0 ? `今天有 ${openTaskCount.value} 项任务需要处理` : '今天没有待处理的任务',
+)
+
 const activeSessionCount = computed(() => sessions.data.value?.length ?? 0)
 
 interface KpiCard {
@@ -48,14 +55,15 @@ interface KpiCard {
   hint: string
   icon: Component
   routeName: string
+  query?: Record<string, string>
 }
 
 const kpis = computed<KpiCard[]>(() => [
   {
     key: 'tasks',
     label: '我的任务',
-    value: summary.data.value?.kpis.myOpenTasks ?? 0,
-    hint: 'Phase 4 起接入',
+    value: openTaskCount.value,
+    hint: '我是负责人 / 协作成员的未完成任务',
     icon: Tickets,
     routeName: 'my-tasks',
   },
@@ -63,7 +71,7 @@ const kpis = computed<KpiCard[]>(() => [
     key: 'approvals',
     label: '待我审批',
     value: summary.data.value?.kpis.pendingApprovals ?? 0,
-    hint: 'Phase 6 起接入',
+    hint: '审批模块 Phase 6 交付',
     icon: Stamp,
     routeName: 'approvals',
   },
@@ -79,11 +87,20 @@ const kpis = computed<KpiCard[]>(() => [
     key: 'due',
     label: '即将到期',
     value: summary.data.value?.kpis.dueSoonTasks ?? 0,
-    hint: 'Phase 4 起接入',
+    hint: '未来 7 天到期（含已逾期）',
     icon: DataAnalysis,
     routeName: 'my-tasks',
+    query: { filter: 'DUE_SOON' },
   },
 ])
+
+function openTask(task: TaskCard): void {
+  void router.push({
+    name: 'project-board',
+    params: { id: String(task.projectId) },
+    query: { task: String(task.id) },
+  })
+}
 </script>
 
 <template>
@@ -92,10 +109,10 @@ const kpis = computed<KpiCard[]>(() => [
     <header class="workspace__greeting">
       <div>
         <h1 class="workspace__hello">{{ hello }}</h1>
-        <p class="workspace__date">{{ today }}</p>
+        <p class="workspace__date">{{ today }} · {{ taskBrief }}</p>
       </div>
       <p class="workspace__status">
-        EasyOA v0.1.0 · 账号、权限与安全审计已就绪，协作模块将随版本逐步开放
+        EasyOA v0.1.0 · 账号、权限、组织、项目与任务已就绪，审批与通知将随版本逐步开放
       </p>
     </header>
 
@@ -112,7 +129,7 @@ const kpis = computed<KpiCard[]>(() => [
         :key="kpi.key"
         type="button"
         class="kpi-card"
-        @click="router.push({ name: kpi.routeName })"
+        @click="router.push({ name: kpi.routeName, query: kpi.query })"
       >
         <div class="kpi-card__top">
           <span class="kpi-card__label">{{ kpi.label }}</span>
@@ -133,13 +150,53 @@ const kpis = computed<KpiCard[]>(() => [
       <div class="easy-card">
         <div class="easy-card__header">
           <span class="easy-card__title">我的任务</span>
+          <EasyButton
+            v-if="(summary.data.value?.myTasks.length ?? 0) > 0"
+            size="sm"
+            @click="router.push({ name: 'my-tasks' })"
+          >
+            全部任务
+          </EasyButton>
+        </div>
+        <div v-if="(summary.data.value?.myTasks.length ?? 0) > 0" class="my-task-list">
+          <button
+            v-for="task in summary.data.value?.myTasks ?? []"
+            :key="task.id"
+            type="button"
+            class="my-task-item"
+            @click="openTask(task)"
+          >
+            <div class="my-task-item__head">
+              <span class="my-task-item__title">{{ task.title }}</span>
+              <span v-if="task.overdue" class="my-task-item__overdue">已逾期</span>
+              <span v-else-if="task.blocked" class="my-task-item__blocked">阻塞 {{ task.blockerCount }}</span>
+            </div>
+            <div class="my-task-item__meta">
+              <span>{{ task.projectName }}</span>
+              <EasyStatus :label="task.status.name" :tone="taskStatusTypeTone(task.status.systemType)" />
+              <EasyStatus :label="taskPriorityLabel(task.priority)" :tone="taskPriorityTone(task.priority)" />
+              <span class="my-task-item__due" :class="{ 'my-task-item__due--overdue': task.overdue }">
+                {{ formatDate(task.plannedEndAt) }}
+              </span>
+            </div>
+            <div class="my-task-item__progress">
+              <div class="progress">
+                <div class="progress__bar" :style="{ width: `${task.progress}%` }" />
+              </div>
+              <span class="progress__value">{{ task.progress }}%</span>
+            </div>
+          </button>
         </div>
         <EasyEmpty
+          v-else
           compact
           title="还没有任务数据"
-          phase="Phase 4"
-          description="任务工作流、子任务、依赖与看板将在 Phase 4 交付，届时这里会展示你的近期任务。"
-        />
+          description="任务由项目负责人在项目看板中创建并派发；指派给你的任务会在这里汇总。"
+        >
+          <template #action>
+            <EasyButton size="sm" variant="primary" @click="router.push({ name: 'my-tasks' })">查看我的任务</EasyButton>
+          </template>
+        </EasyEmpty>
       </div>
 
       <div class="easy-card">
@@ -463,5 +520,87 @@ const kpis = computed<KpiCard[]>(() => [
   gap: var(--easy-space-4);
   font-size: var(--easy-text-xs);
   color: var(--easy-text-3);
+}
+
+/* --- 我的任务区块（Phase 4 起为真实数据） ------------------------------------- */
+.my-task-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--easy-space-2);
+}
+
+.my-task-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-2);
+  padding: var(--easy-space-3);
+  border: none;
+  border-radius: var(--easy-radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--easy-transition-fast);
+}
+
+.my-task-item:hover {
+  background: var(--easy-surface-hover);
+}
+
+.my-task-item__head {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-2);
+  min-width: 0;
+}
+
+.my-task-item__title {
+  font-size: var(--easy-text-sm);
+  font-weight: 600;
+  color: var(--easy-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-task-item__overdue,
+.my-task-item__blocked {
+  flex: none;
+  font-size: var(--easy-text-xs);
+  border-radius: var(--easy-radius-full);
+  padding: 1px 8px;
+}
+
+.my-task-item__overdue {
+  color: var(--easy-danger);
+  border: 1px solid var(--easy-danger);
+}
+
+.my-task-item__blocked {
+  color: var(--easy-warning);
+  border: 1px solid var(--easy-warning);
+}
+
+.my-task-item__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+  flex-wrap: wrap;
+}
+
+.my-task-item__due {
+  font-variant-numeric: tabular-nums;
+}
+
+.my-task-item__due--overdue {
+  color: var(--easy-danger);
+  font-weight: 600;
+}
+
+.my-task-item__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
 }
 </style>

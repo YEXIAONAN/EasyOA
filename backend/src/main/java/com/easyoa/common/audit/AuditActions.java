@@ -51,6 +51,8 @@ public final class AuditActions {
     public static final String TASK_PROGRESS_CHANGED = "TASK_PROGRESS_CHANGED";
     public static final String TASK_COMPLETED = "TASK_COMPLETED";
     public static final String TASK_OVERRIDE_DEPENDENCY = "TASK_OVERRIDE_DEPENDENCY";
+    public static final String TASK_ASSIGNMENT_APPROVED = "TASK_ASSIGNMENT_APPROVED";
+    public static final String TASK_ASSIGNMENT_REJECTED = "TASK_ASSIGNMENT_REJECTED";
 
     // --- 评论（Phase 5 起使用） ---
     public static final String COMMENT_EDITED = "COMMENT_EDITED";

@@ -38,7 +38,10 @@ public enum ErrorCode {
 
     // --- 首次初始化 ---
     SETUP_ALREADY_COMPLETED(HttpStatus.CONFLICT, "系统已完成初始化，无法重复执行"),
-    USERNAME_TAKEN(HttpStatus.CONFLICT, "用户名已被占用");
+    USERNAME_TAKEN(HttpStatus.CONFLICT, "用户名已被占用"),
+
+    // --- 任务（Phase 4）：依赖阻塞需要前端触发「忽略依赖并开始」流程 ---
+    TASK_BLOCKED_BY_DEPENDENCIES(HttpStatus.CONFLICT, "当前任务仍有未完成的前置依赖");
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

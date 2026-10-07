@@ -35,6 +35,7 @@ import com.easyoa.project.dto.ProjectMemberView;
 import com.easyoa.project.dto.UpdateProjectRequest;
 import com.easyoa.project.repository.ProjectMemberRepository;
 import com.easyoa.project.repository.ProjectRepository;
+import com.easyoa.task.application.TaskStatusService;
 import com.easyoa.user.application.UserService;
 import com.easyoa.user.domain.User;
 
@@ -49,14 +50,17 @@ public class ProjectService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final AuditService auditService;
+    private final TaskStatusService taskStatusService;
 
     public ProjectService(ProjectRepository projectRepository, ProjectMemberRepository projectMemberRepository,
-            ProjectPermissionService permissionService, UserService userService, AuditService auditService) {
+            ProjectPermissionService permissionService, UserService userService, AuditService auditService,
+            TaskStatusService taskStatusService) {
         this.projectRepository = projectRepository;
         this.projectMemberRepository = projectMemberRepository;
         this.permissionService = permissionService;
         this.userService = userService;
         this.auditService = auditService;
+        this.taskStatusService = taskStatusService;
     }
 
     // --- 查询 -----------------------------------------------------------------
@@ -134,6 +138,9 @@ public class ProjectService {
             project.changeStatus(initialStatus);
         }
         projectRepository.save(project);
+
+        // 任务模块：为新项目初始化默认任务状态模板（待处理 → 进行中 → 待审核 → 已完成）
+        taskStatusService.ensureDefaultStatuses(project);
 
         // 创建者自动成为 OWNER
         User actorUser = userService.getById(actor.id());

@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# EasyOA — ignore rules
+# ---------------------------------------------------------------------------
+
+# Secrets & environment
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+!infra/nginx/certs/.gitkeep
+
+# Backend — Java / Maven
+backend/target/
+*.class
+*.jar
+*.war
+!**/src/**/*.jar
+# Maven Wrapper jar 需要提交，保证任何人 clone 后可直接 ./mvnw 构建
+!backend/.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
+replay_pid*
+
+# Frontend — Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/coverage/
+frontend/.vite/
+frontend/*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & runtime
+logs/
+*.log
+backend/logs/
+
+# Docker volumes (if bind-mounted locally)
+infra/data/
+
+# Build/release artifacts
+release/
+*.tar.gz
+*.zip

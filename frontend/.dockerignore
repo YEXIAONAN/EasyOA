@@ -1,0 +1,14 @@
+# 前端构建产物与依赖
+node_modules
+dist
+.vite
+coverage
+*.tsbuildinfo
+.env
+.env.local
+
+# 编辑器 / 系统
+.vscode
+.idea
+.DS_Store
+*.log

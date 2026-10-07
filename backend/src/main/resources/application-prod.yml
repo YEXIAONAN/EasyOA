@@ -1,0 +1,29 @@
+# 生产环境：容器内运行，强制 HTTPS Cookie，关闭 API 文档，不产生任何演示数据
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT:5432}/${POSTGRES_DB:easyoa}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+
+easyoa:
+  security:
+    # 生产环境必须显式注入；缺失时应用启动失败（fail fast，而不是降级使用弱密钥）
+    session-secret: ${EASYOA_SESSION_SECRET}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.easyoa: INFO
+    EASYOA_ACCESS: INFO

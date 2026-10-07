@@ -1,0 +1,136 @@
+/* =============================================================================
+   EasyOA Design Tokens — Easy 系列视觉系统
+   -----------------------------------------------------------------------------
+   设计原则：
+     * 90% 中性色 + 10% Easy Green：品牌绿只出现在 Logo / 主按钮 / 当前导航 /
+       Progress / Active / Success / Selected；
+     * 高留白、低噪音、强信息层级（现代 SaaS Workspace 风格）；
+     * 不使用大面积渐变、玻璃拟态、发光效果；
+     * 私有化部署友好：字体仅使用系统字体栈，不加载任何外部资源。
+   ============================================================================= */
+
+:root {
+  /* --- 品牌色：Easy Green ------------------------------------------------- */
+  --easy-green-50: #f0fdf4;
+  --easy-green-100: #dcfce7;
+  --easy-green-200: #bbf7d0;
+  --easy-green-300: #86efac;
+  --easy-green-400: #4ade80;
+  --easy-green-500: #22c55e;
+  --easy-green-600: #16a34a;
+  --easy-green-700: #15803d;
+  --easy-green-800: #166534;
+
+  /* 品牌使用点（语义别名） */
+  --easy-brand: var(--easy-green-600);
+  --easy-brand-hover: var(--easy-green-700);
+  --easy-brand-active: var(--easy-green-800);
+  --easy-brand-subtle: var(--easy-green-50);
+  --easy-brand-subtle-border: var(--easy-green-200);
+  --easy-brand-text: var(--easy-green-700);
+
+  /* --- 中性色（90%） ------------------------------------------------------ */
+  --easy-bg: #f7f8fa;                 /* 应用背景 */
+  --easy-surface: #ffffff;            /* 卡片 / 面板 */
+  --easy-surface-sunken: #f2f4f7;     /* 次级容器 / 骨架 */
+  --easy-surface-hover: #f6f7f9;      /* hover 背景 */
+  --easy-surface-active: #eef0f4;     /* pressed 背景 */
+
+  --easy-border: #e9ebef;             /* 极浅灰描边 */
+  --easy-border-strong: #dde0e6;      /* 输入框 / 强调描边 */
+
+  --easy-text-1: #1f2329;             /* 主文本（深灰黑） */
+  --easy-text-2: #4e5969;             /* 次级文本 */
+  --easy-text-3: #86909c;             /* 辅助 / 占位文本 */
+  --easy-text-inverse: #ffffff;
+
+  /* --- 语义色 ------------------------------------------------------------- */
+  --easy-success: var(--easy-green-600);
+  --easy-success-bg: var(--easy-green-50);
+  --easy-warning: #d97706;
+  --easy-warning-bg: #fffbeb;
+  --easy-danger: #dc2626;
+  --easy-danger-bg: #fef2f2;
+  --easy-info: #2563eb;
+  --easy-info-bg: #eff6ff;
+
+  /* --- 圆角 --------------------------------------------------------------- */
+  --easy-radius-xs: 4px;
+  --easy-radius-sm: 6px;
+  --easy-radius-md: 8px;
+  --easy-radius-lg: 12px;
+  --easy-radius-xl: 16px;
+  --easy-radius-full: 999px;
+
+  /* --- 阴影（克制、低对比） ----------------------------------------------- */
+  --easy-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --easy-shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --easy-shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --easy-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
+  --easy-shadow-pop: 0 16px 48px rgba(16, 24, 40, 0.16);
+
+  /* --- 字体 --------------------------------------------------------------- */
+  --easy-font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --easy-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --easy-text-xs: 12px;
+  --easy-text-sm: 13px;
+  --easy-text-base: 14px;
+  --easy-text-md: 15px;
+  --easy-text-lg: 16px;
+  --easy-text-xl: 20px;
+  --easy-text-2xl: 24px;
+  --easy-text-3xl: 30px;
+
+  --easy-leading-tight: 1.25;
+  --easy-leading-normal: 1.5;
+  --easy-leading-relaxed: 1.7;
+
+  /* --- 间距（4px 基准） ---------------------------------------------------- */
+  --easy-space-1: 4px;
+  --easy-space-2: 8px;
+  --easy-space-3: 12px;
+  --easy-space-4: 16px;
+  --easy-space-5: 20px;
+  --easy-space-6: 24px;
+  --easy-space-8: 32px;
+  --easy-space-10: 40px;
+  --easy-space-12: 48px;
+  --easy-space-16: 64px;
+
+  /* --- 布局尺寸（1440+ 最佳、1280 完整、1024 可用） ------------------------ */
+  --easy-sidebar-width: 232px;
+  --easy-sidebar-width-collapsed: 64px;
+  --easy-topbar-height: 56px;
+  --easy-content-max-width: 1240px;
+  --easy-content-padding-x: 32px;
+
+  /* --- 动效 --------------------------------------------------------------- */
+  --easy-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --easy-transition-fast: 120ms var(--easy-ease);
+  --easy-transition-base: 180ms var(--easy-ease);
+  --easy-transition-slow: 280ms var(--easy-ease);
+
+  /* --- 层级 --------------------------------------------------------------- */
+  --easy-z-sticky: 10;
+  --easy-z-topbar: 100;
+  --easy-z-dropdown: 1000;
+  --easy-z-modal: 2000;
+  --easy-z-palette: 3000;
+  --easy-z-toast: 4000;
+}
+
+/* 窄屏（1024 可用）：收紧内容间距，保持信息密度 */
+@media (max-width: 1279px) {
+  :root {
+    --easy-content-padding-x: 24px;
+  }
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --easy-content-padding-x: 20px;
+    --easy-sidebar-width: 208px;
+  }
+}

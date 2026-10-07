@@ -1,0 +1,23 @@
+# 开发环境（本地）：HTTP + localhost，Cookie 不强制 Secure，允许自动种子数据
+spring:
+  datasource:
+    url: ${EASYOA_DB_URL:jdbc:postgresql://localhost:5432/easyoa}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+easyoa:
+  security:
+    # 仅用于本地开发的默认密钥，生产环境必须通过 EASYOA_SESSION_SECRET 注入随机值
+    session-secret: ${EASYOA_SESSION_SECRET:dev-only-session-secret-please-change-32chars}
+  dev-seed:
+    # 需要验证「首次初始化 /setup」流程时设为 false，跳过演示账号注入
+    enabled: ${EASYOA_DEV_SEED:true}
+
+logging:
+  level:
+    com.easyoa: DEBUG
+    EASYOA_ACCESS: INFO

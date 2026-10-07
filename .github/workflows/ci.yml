@@ -1,0 +1,145 @@
+name: CI
+
+# 触发：push 与 pull_request 都必须通过完整校验
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 后端：编译 + 单元测试 + 集成测试（Testcontainers 真实 PostgreSQL）+ 打包
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend (Java 21)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Compile
+        run: ./mvnw -B -DskipTests compile
+
+      - name: Test (unit + integration, Testcontainers)
+        run: ./mvnw -B test
+
+      - name: Package
+        run: ./mvnw -B -DskipTests package
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: ignore
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: easyoa-api-jar
+          path: backend/target/easyoa-api-*.jar
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 前端：依赖安装 + 类型检查 + 构建
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (Node 20)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check (TypeScript strict)
+        run: npm run type-check
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: easyoa-web-dist
+          path: frontend/dist/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 部署编排校验：Compose 配置必须可解析（防止上线前才发现语法/变量错误）
+  # ---------------------------------------------------------------------------
+  compose-config:
+    name: Docker Compose config validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Validate production compose
+        run: docker compose -f docker-compose.yml config -q
+
+      - name: Validate dev compose
+        run: docker compose -f docker-compose.dev.yml config -q
+
+  # ---------------------------------------------------------------------------
+  # Release：仅 Tag（vX.Y.Z）触发，构建 Docker 部署包并创建 GitHub Release
+  # ---------------------------------------------------------------------------
+  release:
+    name: Release package
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Build docker images
+        run: docker compose -f docker-compose.yml build
+
+      - name: Export deployment package
+        run: |
+          mkdir -p release
+          docker save easyoa-easyoa-api easyoa-easyoa-web nginx:1.27-alpine postgres:16-alpine \
+            | gzip > release/easyoa-${{ github.ref_name }}-images.tar.gz
+          cp docker-compose.yml docker-compose.dev.yml .env.example LICENSE release/
+          cp -r infra release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: EasyOA ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/easyoa-${{ github.ref_name }}-images.tar.gz

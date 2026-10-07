@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: easyoa-api
+  profiles:
+    default: dev
+  datasource:
+    url: ${EASYOA_DB_URL:jdbc:postgresql://localhost:5432/easyoa}
+    username: ${POSTGRES_USER:easyoa}
+    password: ${POSTGRES_PASSWORD:easyoa}
+    hikari:
+      pool-name: easyoa-pool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # 生产禁止 create/update，Schema 只由 Flyway 管理
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      # DTO 之外的字段一律拒绝，防止 Mass Assignment 类问题被静默吞掉
+      fail-on-unknown-properties: true
+  servlet:
+    multipart:
+      max-file-size: ${EASYOA_STORAGE_MAX_FILE_SIZE:20971520}
+      max-request-size: ${EASYOA_STORAGE_MAX_FILE_SIZE:20971520}
+
+server:
+  port: ${EASYOA_API_PORT:8080}
+  shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        name: EASYOA_SESSION
+        http-only: true
+        same-site: lax
+      timeout: ${EASYOA_SESSION_TIMEOUT_MINUTES:480}m
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/css,application/javascript
+    min-response-size: 1024
+  error:
+    whitelabel:
+      enabled: false
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+easyoa:
+  security:
+    session-timeout: ${EASYOA_SESSION_TIMEOUT_MINUTES:480}m
+    login-max-failures: ${EASYOA_LOGIN_MAX_FAILURES:5}
+    login-lock-minutes: ${EASYOA_LOGIN_LOCK_MINUTES:15}
+  setup:
+    organization-name: ${EASYOA_ORG_NAME:Easy Studio}
+  storage:
+    path: ${EASYOA_STORAGE_PATH:/var/lib/easyoa/storage}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

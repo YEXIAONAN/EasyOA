@@ -1,0 +1,7 @@
+target
+.mvn/wrapper/maven-wrapper.jar
+logs
+*.log
+.idea
+.vscode
+.DS_Store

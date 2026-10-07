@@ -1,0 +1,218 @@
+/* =============================================================================
+   EasyOA Base — reset / 排版 / 通用容器 / 滚动条
+   ============================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--easy-bg);
+  color: var(--easy-text-1);
+  font-family: var(--easy-font-sans);
+  font-size: var(--easy-text-base);
+  line-height: var(--easy-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--easy-brand);
+  outline-offset: 2px;
+  border-radius: var(--easy-radius-xs);
+}
+
+/* --- 滚动条：细、低调 ------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(31, 35, 41, 0.16);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--easy-radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 35, 41, 0.28);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- 通用布局 -------------------------------------------------------------- */
+.easy-page {
+  width: 100%;
+  max-width: var(--easy-content-max-width);
+  margin: 0 auto;
+  padding: var(--easy-space-6) var(--easy-content-padding-x) var(--easy-space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-6);
+}
+
+.easy-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--easy-space-4);
+}
+
+.easy-page__title {
+  font-size: var(--easy-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.easy-page__subtitle {
+  margin-top: var(--easy-space-1);
+  color: var(--easy-text-3);
+  font-size: var(--easy-text-sm);
+}
+
+/* --- 卡片 ------------------------------------------------------------------ */
+.easy-card {
+  background: var(--easy-surface);
+  border: 1px solid var(--easy-border);
+  border-radius: var(--easy-radius-lg);
+  box-shadow: var(--easy-shadow-xs);
+}
+
+.easy-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--easy-space-3);
+  padding: var(--easy-space-4) var(--easy-space-5);
+  border-bottom: 1px solid var(--easy-border);
+}
+
+.easy-card__title {
+  font-size: var(--easy-text-md);
+  font-weight: 600;
+}
+
+.easy-card__body {
+  padding: var(--easy-space-5);
+}
+
+.easy-card__body--flush {
+  padding: 0;
+}
+
+/* --- 文本工具类 ------------------------------------------------------------ */
+.easy-muted {
+  color: var(--easy-text-3);
+}
+
+.easy-secondary {
+  color: var(--easy-text-2);
+}
+
+.easy-text-sm {
+  font-size: var(--easy-text-sm);
+}
+
+.easy-text-xs {
+  font-size: var(--easy-text-xs);
+}
+
+.easy-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.easy-mono {
+  font-family: var(--easy-font-mono);
+}
+
+/* --- 状态点 / 徽标 --------------------------------------------------------- */
+.easy-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--easy-radius-full);
+  background: var(--easy-text-3);
+}
+
+.easy-dot--success {
+  background: var(--easy-success);
+}
+
+.easy-dot--warning {
+  background: var(--easy-warning);
+}
+
+.easy-dot--danger {
+  background: var(--easy-danger);
+}
+
+/* --- 淡入动画（内容区切换） ------------------------------------------------ */
+@keyframes easy-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.easy-fade-in {
+  animation: easy-fade-in var(--easy-transition-base);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

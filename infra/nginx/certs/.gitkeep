@@ -1,0 +1,2 @@
+# TLS 证书目录：easyoa.crt / easyoa.key 不提交到 Git（见根目录 .gitignore）
+# 使用 scripts/generate-self-signed-cert.sh 生成本地证书，或在生产环境替换为企业证书。

@@ -1,0 +1,17 @@
+# 集成测试环境：数据源由 Testcontainers 提供（@ServiceConnection），不产生种子数据
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+easyoa:
+  security:
+    session-secret: integration-test-session-secret-not-for-production-32
+    login-max-failures: 5
+    login-lock-minutes: 15
+
+logging:
+  level:
+    com.easyoa: INFO
+    EASYOA_ACCESS: WARN

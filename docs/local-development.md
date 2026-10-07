@@ -45,7 +45,9 @@ cd backend
 | `linda` | `EasyOA@2026` | MEMBER | 产品经理 |
 
 组织树：`技术部`（负责人 admin）→ `后端组`（member）/ `前端组`（kevin）；`产品部`（linda）；`Zero Lab`（root）。
-组织归属按「主部门 + 兼任」安排，可直接用于验证团队页面与组织架构页面。
+组织归属按「主部门 + 兼任」安排。
+演示项目：`EasyOA`（进行中，35%，OWNER = root，副负责人 = admin，成员含 member / kevin / linda），
+可直接用于验证项目列表、项目详情、角色边界与工作台联动。
 
 常用命令：
 
@@ -90,6 +92,7 @@ npm run preview              # 预览构建产物
 | 命令面板 | `⌘K`（macOS）/ `Ctrl+K` |
 | 查看审计数据 | `GET /api/audit-logs`（需 ADMIN / ROOT 登录态） |
 | 组织与成员 | `/organization`、`/team`；接口 `GET /api/org-units`、`GET /api/users/directory` |
+| 项目协作 | `/projects`、`/projects/:id`；接口 `GET /api/projects`、`GET /api/projects/{id}`、`POST /api/projects/{id}/transfer-owner` |
 
 ## 6. 目录约定
 

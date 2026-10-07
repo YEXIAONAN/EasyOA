@@ -57,3 +57,19 @@ export function greeting(date: Date = new Date()): string {
   if (hour < 18) return '下午好'
   return '晚上好'
 }
+
+/** 后端 Instant（UTC ISO）→ &lt;input type="date"&gt; 的值（按用户本地时区展示） */
+export function toDateInputValue(instant?: string | null): string {
+  if (!instant) return ''
+  const date = new Date(instant)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** &lt;input type="date"&gt; 的值 → 后端 Instant（当日 UTC 零点），避免把 "YYYY-MM-DD" 直接发给后端 */
+export function toIsoInstant(dateInput?: string | null): string | undefined {
+  if (!dateInput) return undefined
+  const date = new Date(`${dateInput}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+}

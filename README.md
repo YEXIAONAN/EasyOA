@@ -56,7 +56,11 @@ EasyOA 优先保证：
 | --------------------------- | ----------------------------- |
 | ![团队](docs/screenshots/team.png) | ![组织架构](docs/screenshots/organization.png) |
 
-> 以上截图取自本地真实运行界面（Phase 2 交付版本，数据为真实数据：账号、会话、组织与审计均已生效）。
+| 项目列表 | 项目详情（成员 / 设置 / 归档只读） |
+| -------- | ---------------------------------- |
+| ![项目列表](docs/screenshots/projects.png) | ![项目详情](docs/screenshots/project-detail.png) |
+
+> 以上截图取自本地真实运行界面（Phase 3 交付版本，数据为真实数据：账号、会话、组织、项目与审计均已生效）。
 
 ---
 
@@ -81,6 +85,16 @@ EasyOA 优先保证：
 - **成员目录**：卡片式团队页面，支持关键字 / 组织（自动含下级）/ 状态筛选与分页
 - **成员档案**：右侧侧栏展示组织归属、职位、联系方式（**按权限过滤**：本人 / 管理员 / 所在组织负责人可见）
 - **账号管理**：创建成员（ADMIN 仅能创建 MEMBER，创建管理员需 ROOT）、启用禁用、角色变更；**禁用或改角色即刻撤销其全部会话**；系统始终保留至少一个 ROOT
+
+**项目协作（Phase 3）**
+
+- **项目生命周期**：DRAFT → ACTIVE ⇄ PAUSED / COMPLETED → ARCHIVED；只允许规范内的流转（非法流转返回 409），**归档后只读且不提供删除**
+- **项目角色**：OWNER × 1、DEPUTY_OWNER × 0~1、MEMBER × N——由数据库 Partial Unique Index 兜底保证唯一性，角色与系统角色彻底分离
+- **权限边界**：OWNER 可设置副负责人 / 转让 / 归档；DEPUTY 可管理日常信息、状态与普通成员，但不能改 OWNER、不能归档；MEMBER 只能参与
+- **OWNER 转让**：仅可转让给项目内成员，先降级原 OWNER 再提升新 OWNER（原子且唯一），并写入 CRITICAL 级审计
+- **数据范围**：非项目成员访问一律返回 **404（不泄露项目是否存在）**；管理员可查看全部项目但不会自动获得项目内管理权
+- **项目工作区**：概览 / 看板 / 任务 / 时间线 / 成员 / 设置 六个 Tab，Tab 与 URL query 同步；看板与任务明确标注 Phase 4 交付
+- **工作台联动**：进行中项目 KPI 与「项目进度」区块接入真实项目数据（进度、负责人、成员规模、我的角色）
 
 **工程基建**
 
@@ -127,8 +141,9 @@ repository / dto` 分层；`v0.1.0` 不引入微服务、消息队列、Redis �
 | `audit` | 审计日志（Append Only，查询仅 ADMIN / ROOT） |
 | `securityevent` | 安全事件与哈希链 |
 | `organization` | 组织树、组织归属与主部门、组织负责人（Phase 2 已交付） |
-| `workspace` | 工作台聚合 |
-| `project` / `task` / `approval` / `notification` / `file` | 目录骨架已就位，按 Phase 3~6 交付 |
+| `project` | 项目生命周期、项目角色与成员、项目权限（Phase 3 已交付） |
+| `workspace` | 工作台聚合（已接入真实项目数据） |
+| `task` / `approval` / `notification` / `file` | 目录骨架已就位，按 Phase 4~6 交付 |
 
 ---
 
@@ -301,8 +316,8 @@ EasyOA/
 | Phase 0 | 仓库基建：README / CI / Docker Compose / Nginx / 环境样例 | ✅ 已完成 |
 | Phase 1 | 核心基建：User / Auth / Session / Security / Error / Audit / 初始化 | ✅ 已完成 |
 | Phase 2 | 组织架构：组织树、多组织归属、主部门、团队页面、成员档案 | ✅ 已完成 |
-| Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ⏳ 下一步 |
-| Phase 4 | 任务：工作流、子任务、依赖与循环检测、看板、任务侧栏（**v0.1.0 重点**） | ⏳ |
+| Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ✅ 已完成 |
+| Phase 4 | 任务：工作流、子任务、依赖与循环检测、看板、任务侧栏（**v0.1.0 重点**） | ⏳ 下一步 |
 | Phase 5 | 评论与文件：回复 / @ / 编辑历史 / 撤回 / 受控下载 | ⏳ |
 | Phase 6 | 审批：模板版本、表单快照、ANY_ONE / ALL、动态与替补审批人 | ⏳ |
 | Phase 7 | 工作台：通知中心、全局搜索、命令面板检索、Activity Feed | ⏳ |

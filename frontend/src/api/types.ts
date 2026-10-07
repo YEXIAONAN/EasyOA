@@ -68,6 +68,84 @@ export interface WorkspaceSummary {
     activeProjects: number
     dueSoonTasks: number
   }
+  /** 当前用户参与的项目（工作台「项目进度」区块，Phase 3 起为真实数据） */
+  projectProgress: ProjectCard[]
+}
+
+// ---------------------------------------------------------------------------
+// 项目协作（Phase 3）
+// ---------------------------------------------------------------------------
+
+export type ProjectStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'ARCHIVED'
+export type ProjectRole = 'OWNER' | 'DEPUTY_OWNER' | 'MEMBER'
+
+export interface ProjectMemberView {
+  userId: number
+  username: string
+  displayName: string
+  avatarUrl?: string
+  jobTitle?: string
+  role: ProjectRole
+  joinedAt: string
+}
+
+export interface ProjectCard {
+  id: number
+  name: string
+  description?: string
+  status: ProjectStatus
+  progress: number
+  plannedStartAt?: string
+  plannedEndAt?: string
+  owner?: ProjectMemberView
+  deputyOwner?: ProjectMemberView
+  memberCount: number
+  myRole?: ProjectRole
+  updatedAt: string
+}
+
+export interface ProjectPermissions {
+  canEditInfo: boolean
+  canChangeStatus: boolean
+  canManageMembers: boolean
+  canSetDeputy: boolean
+  canTransferOwner: boolean
+  canArchive: boolean
+}
+
+export interface ProjectDetail {
+  id: number
+  name: string
+  description?: string
+  status: ProjectStatus
+  progress: number
+  plannedStartAt?: string
+  plannedEndAt?: string
+  archivedAt?: string
+  createdAt: string
+  updatedAt: string
+  owner?: ProjectMemberView
+  deputyOwner?: ProjectMemberView
+  members: ProjectMemberView[]
+  myRole?: ProjectRole
+  permissions: ProjectPermissions
+}
+
+export interface CreateProjectPayload {
+  name: string
+  description?: string
+  plannedStartAt?: string
+  plannedEndAt?: string
+  memberUserIds?: number[]
+  progress?: number
+  status?: ProjectStatus
+}
+
+export interface UpdateProjectPayload {
+  name: string
+  description?: string
+  plannedStartAt?: string
+  plannedEndAt?: string
 }
 
 // ---------------------------------------------------------------------------

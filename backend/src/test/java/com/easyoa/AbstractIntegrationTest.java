@@ -99,7 +99,9 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void resetSystemState() {
-        // 组织数据使用原生 SQL 清理：org_units 自引用外键（on delete cascade）无法通过实体逐行删除
+        // 组织 / 项目数据使用原生 SQL 清理：自引用外键与级联关系无法通过实体逐行删除
+        jdbcTemplate.execute("delete from project_members");
+        jdbcTemplate.execute("delete from projects");
         jdbcTemplate.execute("delete from user_org_memberships");
         jdbcTemplate.execute("delete from org_units");
         userSessionRepository.deleteAll();
@@ -213,5 +215,28 @@ public abstract class AbstractIntegrationTest {
 
     protected String json(Object value) throws Exception {
         return objectMapper.writeValueAsString(value);
+    }
+
+    /** 通过真实接口创建项目，返回项目 ID。 */
+    protected Long createProjectViaApi(MockHttpSession session, String name, String status,
+            java.util.List<Long> memberUserIds) throws Exception {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("name", name);
+        body.put("description", name + " 的简介");
+        if (status != null) {
+            body.put("status", status);
+        }
+        if (memberUserIds != null) {
+            body.put("memberUserIds", memberUserIds);
+        }
+        MvcResult result = mockMvc
+                .perform(post("/api/projects")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
     }
 }

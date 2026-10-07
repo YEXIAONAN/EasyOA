@@ -27,7 +27,7 @@ withDefaults(
 
 defineOptions({ inheritAttrs: false })
 
-const model = defineModel<string | number | null | undefined>()
+const model = defineModel<string | number | Array<string | number> | null | undefined>()
 
 const attrs = useAttrs()
 const rootClass = computed(() => attrs.class ?? null)

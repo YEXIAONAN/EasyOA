@@ -8,9 +8,11 @@ import { authApi } from '@/api/modules/auth'
 import { workspaceApi } from '@/api/modules/workspace'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyEmpty from '@/components/easy/EasyEmpty.vue'
+import EasyStatus from '@/components/easy/EasyStatus.vue'
 import { useAsync } from '@/composables/useAsync'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime, formatRelative, greeting } from '@/utils/format'
+import { projectRoleLabel, projectStatusLabel, projectStatusTone } from '@/utils/project'
 
 /**
  * 工作台首页：回答三个问题 ——
@@ -69,7 +71,7 @@ const kpis = computed<KpiCard[]>(() => [
     key: 'projects',
     label: '进行中项目',
     value: summary.data.value?.kpis.activeProjects ?? 0,
-    hint: 'Phase 3 起接入',
+    hint: '点击进入项目列表',
     icon: Folder,
     routeName: 'projects',
   },
@@ -170,13 +172,45 @@ const kpis = computed<KpiCard[]>(() => [
       <div class="easy-card">
         <div class="easy-card__header">
           <span class="easy-card__title">项目进度</span>
+          <EasyButton v-if="(summary.data.value?.projectProgress.length ?? 0) > 0" size="sm" @click="router.push({ name: 'projects' })">
+            全部项目
+          </EasyButton>
+        </div>
+        <div v-if="(summary.data.value?.projectProgress.length ?? 0) > 0" class="project-progress-list">
+          <button
+            v-for="project in summary.data.value?.projectProgress ?? []"
+            :key="project.id"
+            type="button"
+            class="project-progress-item"
+            @click="router.push({ name: 'project-detail', params: { id: project.id } })"
+          >
+            <div class="project-progress-item__head">
+              <span class="project-progress-item__name">{{ project.name }}</span>
+              <EasyStatus :label="projectStatusLabel(project.status)" :tone="projectStatusTone(project.status)" />
+            </div>
+            <div class="project-progress-item__bar">
+              <div class="progress">
+                <div class="progress__bar" :style="{ width: `${project.progress}%` }" />
+              </div>
+              <span class="progress__value">{{ project.progress }}%</span>
+            </div>
+            <div class="project-progress-item__meta">
+              <span>{{ project.owner?.displayName ?? '未设置负责人' }}</span>
+              <span>{{ project.memberCount }} 位成员</span>
+              <span v-if="project.myRole">{{ projectRoleLabel(project.myRole) }}</span>
+            </div>
+          </button>
         </div>
         <EasyEmpty
+          v-else
           compact
-          title="暂无项目"
-          phase="Phase 3"
-          description="项目模块交付后，这里会展示项目总进度、成员与关键阶段。"
-        />
+          title="还没有参与的项目"
+          description="创建或加入项目后，这里会展示项目总进度、负责人与成员规模。"
+        >
+          <template #action>
+            <EasyButton size="sm" variant="primary" @click="router.push({ name: 'projects' })">去创建项目</EasyButton>
+          </template>
+        </EasyEmpty>
       </div>
     </section>
 
@@ -355,5 +389,79 @@ const kpis = computed<KpiCard[]>(() => [
 .security-item__hint {
   color: var(--easy-text-3);
   font-size: var(--easy-text-xs);
+}
+
+/* --- 项目进度区块（Phase 3 起为真实数据） ------------------------------------ */
+.project-progress-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--easy-space-2);
+}
+
+.project-progress-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-2);
+  padding: var(--easy-space-3);
+  border: none;
+  border-radius: var(--easy-radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--easy-transition-fast);
+}
+
+.project-progress-item:hover {
+  background: var(--easy-surface-hover);
+}
+
+.project-progress-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--easy-space-2);
+}
+
+.project-progress-item__name {
+  font-size: var(--easy-text-sm);
+  font-weight: 600;
+  color: var(--easy-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-progress-item__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+}
+
+.progress {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--easy-radius-full);
+  background: var(--easy-surface-sunken);
+  overflow: hidden;
+}
+
+.progress__bar {
+  height: 100%;
+  border-radius: var(--easy-radius-full);
+  background: var(--easy-brand);
+  transition: width var(--easy-transition-base);
+}
+
+.progress__value {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-progress-item__meta {
+  display: flex;
+  gap: var(--easy-space-4);
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
 }
 </style>

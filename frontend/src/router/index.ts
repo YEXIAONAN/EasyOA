@@ -37,12 +37,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'projects',
         name: 'projects',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '项目',
-          phase: 'Phase 3',
-          summary: '项目协作、生命周期、成员与权限体系将在 Phase 3 交付。',
-        },
+        component: () => import('@/views/ProjectsView.vue'),
+        meta: { title: '项目' },
+      },
+      {
+        path: 'projects/:id(\\d+)',
+        name: 'project-detail',
+        component: () => import('@/views/ProjectDetailView.vue'),
+        meta: { title: '项目详情' },
       },
       {
         path: 'my-tasks',

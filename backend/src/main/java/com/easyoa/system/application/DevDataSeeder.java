@@ -1,6 +1,7 @@
 package com.easyoa.system.application;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,12 @@ import com.easyoa.organization.domain.OrgUnit;
 import com.easyoa.organization.domain.OrgUnitType;
 import com.easyoa.organization.repository.OrgMembershipRepository;
 import com.easyoa.organization.repository.OrgUnitRepository;
+import com.easyoa.project.domain.Project;
+import com.easyoa.project.domain.ProjectMember;
+import com.easyoa.project.domain.ProjectRole;
+import com.easyoa.project.domain.ProjectStatus;
+import com.easyoa.project.repository.ProjectMemberRepository;
+import com.easyoa.project.repository.ProjectRepository;
 import com.easyoa.user.application.UserService;
 import com.easyoa.user.domain.SystemRole;
 import com.easyoa.user.domain.User;
@@ -43,16 +50,21 @@ public class DevDataSeeder implements ApplicationRunner {
     private final UserRepository userRepository;
     private final OrgUnitRepository orgUnitRepository;
     private final OrgMembershipRepository orgMembershipRepository;
+    private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final UserService userService;
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
 
     public DevDataSeeder(UserRepository userRepository, OrgUnitRepository orgUnitRepository,
-            OrgMembershipRepository orgMembershipRepository, UserService userService,
+            OrgMembershipRepository orgMembershipRepository, ProjectRepository projectRepository,
+            ProjectMemberRepository projectMemberRepository, UserService userService,
             SystemSettingService systemSettingService, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.orgUnitRepository = orgUnitRepository;
         this.orgMembershipRepository = orgMembershipRepository;
+        this.projectRepository = projectRepository;
+        this.projectMemberRepository = projectMemberRepository;
         this.userService = userService;
         this.systemSettingService = systemSettingService;
         this.passwordEncoder = passwordEncoder;
@@ -93,8 +105,22 @@ public class DevDataSeeder implements ApplicationRunner {
         systemSettingService.setValue(SystemSettingService.KEY_ORGANIZATION_NAME, "Easy Studio", root.getId());
         systemSettingService.markSetupCompleted(root.getId());
 
+        // --- 演示项目（Phase 3） --------------------------------------------------
+        Project demo = new Project("EasyOA", "EasyOA v0.1.0 交付：账号与权限、组织架构、项目协作", root.getId());
+        demo.changeProgress(35);
+        demo.changeStatus(ProjectStatus.ACTIVE);
+        demo.updateInfo("EasyOA", "EasyOA v0.1.0 交付：账号与权限、组织架构、项目协作",
+                Instant.now().minus(20, ChronoUnit.DAYS), Instant.now().plus(40, ChronoUnit.DAYS));
+        projectRepository.save(demo);
+        projectMemberRepository.save(new ProjectMember(demo, root, ProjectRole.OWNER));
+        projectMemberRepository.save(new ProjectMember(demo, admin, ProjectRole.DEPUTY_OWNER));
+        projectMemberRepository.save(new ProjectMember(demo, backend, ProjectRole.MEMBER));
+        projectMemberRepository.save(new ProjectMember(demo, frontend, ProjectRole.MEMBER));
+        projectMemberRepository.save(new ProjectMember(demo, product, ProjectRole.MEMBER));
+
         log.info("开发环境种子数据已写入：root / admin / member / kevin / linda，"
-                + "组织树：技术部（后端组 / 前端组）、产品部、Zero Lab createdAt={}", Instant.now());
+                + "组织树：技术部（后端组 / 前端组）、产品部、Zero Lab，演示项目：EasyOA（OWNER=root）createdAt={}",
+                Instant.now());
     }
 
     private User createUser(String username, String displayName, String jobTitle, SystemRole role) {

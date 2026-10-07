@@ -24,8 +24,10 @@ const formError = ref<string | null>(null)
 const isDev = import.meta.env.DEV
 
 onMounted(() => {
-  // 提前拿到 CSRF Token（XSRF-TOKEN Cookie），保证登录写请求可通过校验
-  void authApi.csrf().catch(() => undefined)
+  // 仅在缺少 CSRF Cookie 时引导一次，避免多余请求与页面跳转造成的中断噪声
+  if (!document.cookie.includes('XSRF-TOKEN')) {
+    void authApi.csrf().catch(() => undefined)
+  }
 })
 
 /** 仅允许站内跳转，避免开放重定向 */

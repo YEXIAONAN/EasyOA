@@ -102,7 +102,7 @@ backend/src/main/java/com/easyoa/<module>/{controller,application,domain,reposit
 
 - Controller 不写业务逻辑；
 - Service 不直接对外暴露实体；
-- 权限校验在应用层执行（`*PermissionService`，随 Phase 3 起引入）；
+- 权限校验在应用层执行（统一使用 `*PermissionService`，禁止在业务代码里散落角色判断）；
 - 所有输入使用 DTO + Bean Validation；
 - 数据库变更一律通过 Flyway 迁移脚本。
 

@@ -13,7 +13,7 @@
 
   <groupId>com.easyoa</groupId>
   <artifactId>easyoa-api</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <name>easyoa-api</name>
   <description>EasyOA — 面向学生团队 / 小公司 / 工作室的私有化协同办公系统</description>
 

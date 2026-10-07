@@ -1,6 +1,6 @@
 {
   "name": "easyoa-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "EasyOA — 面向学生团队 / 小公司 / 工作室的私有化协同办公系统前端",
   "type": "module",

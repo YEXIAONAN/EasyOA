@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Spring%20Boot-3.5-16A34A.svg" alt="Spring Boot 3.5" />
   <img src="https://img.shields.io/badge/Vue-3.5-16A34A.svg" alt="Vue 3" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-16A34A.svg" alt="PostgreSQL 16" />
-  <img src="https://img.shields.io/badge/version-v0.1.0-16A34A.svg" alt="v0.1.0" />
+  <img src="https://img.shields.io/badge/version-v0.1.1-16A34A.svg" alt="v0.1.1" />
 </p>
 
 ---
@@ -96,13 +96,13 @@ EasyOA 优先保证：
 | ----------------------------------- | ------------------------------ |
 | ![数据中心](docs/screenshots/insights.png) | ![逾期与负载](docs/screenshots/insights-overdue.png) |
 
-> 以上截图取自本地真实运行界面（Phase 9 交付版本，数据为真实数据：账号、会话、组织、项目、任务、审批与审计均已生效）。
+> 以上截图取自本地真实运行界面（v0.1.1，数据为真实数据：账号、会话、组织、项目、任务、审批与审计均已生效）。
 
 ---
 
 ## Features
 
-### v0.1.0 已交付（Phase 0 ~ Phase 9）
+### 功能一览
 
 **账号与安全**
 
@@ -112,30 +112,30 @@ EasyOA 优先保证：
 - **首次初始化**：`/setup` 一次性创建组织与 ROOT，完成后永久关闭（数据库原子开关保证不可重放）
 - **审计基础设施**：审计日志与安全事件 Append Only（仓储层不暴露 update/delete），哈希链预留
 
-**组织与成员（Phase 2）**
+**组织与成员**
 
 - **组织架构**：部门 / 团队两级类型，邻接表组织树，`WITH RECURSIVE` 子树查询，**移动防成环**
 - **组织生命周期**：使用归档（ARCHIVED）而非删除；存在未归档下级时禁止归档；支持恢复
-- **组织负责人**：单元负责人可管理本单位（含下级）成员；同时是 Phase 6 审批人解析（DIRECT_MANAGER / ORG_UNIT_MANAGER）的来源
+- **组织负责人**：单元负责人可管理本单位（含下级）成员；同时是审批人解析（DIRECT_MANAGER / ORG_UNIT_MANAGER）的来源
 - **成员多组织归属**：一个用户可属于多个部门 / 团队；**主部门唯一**（数据库 Partial Unique Index 兜底，首个归属自动成为主部门，移除主部门自动递补）
 - **成员目录**：卡片式团队页面，支持关键字 / 组织（自动含下级）/ 状态筛选与分页
 - **成员档案**：右侧侧栏展示组织归属、职位、联系方式（**按权限过滤**：本人 / 管理员 / 所在组织负责人可见）
 - **账号管理**：创建成员（ADMIN 仅能创建 MEMBER，创建管理员需 ROOT）、启用禁用、角色变更；**禁用或改角色即刻撤销其全部会话**；系统始终保留至少一个 ROOT
 
-**项目协作（Phase 3）**
+**项目协作**
 
 - **项目生命周期**：DRAFT → ACTIVE ⇄ PAUSED / COMPLETED → ARCHIVED；只允许规范内的流转（非法流转返回 409），**归档后只读且不提供删除**
 - **项目角色**：OWNER × 1、DEPUTY_OWNER × 0~1、MEMBER × N——由数据库 Partial Unique Index 兜底保证唯一性，角色与系统角色彻底分离
 - **权限边界**：OWNER 可设置副负责人 / 转让 / 归档；DEPUTY 可管理日常信息、状态与普通成员，但不能改 OWNER、不能归档；MEMBER 只能参与
 - **OWNER 转让**：仅可转让给项目内成员，先降级原 OWNER 再提升新 OWNER（原子且唯一），并写入 CRITICAL 级审计
 - **数据范围**：非项目成员访问一律返回 **404（不泄露项目是否存在）**；管理员可查看全部项目但不会自动获得项目内管理权
-- **项目工作区**：概览 / 看板 / 任务 / 时间线 / 成员 / 设置 六个 Tab；看板与任务在 Phase 4 交付，Tab 与 URL 同步
+- **项目工作区**：概览 / 看板 / 任务 / 时间线 / 成员 / 设置 六个 Tab；看板与任务支持深链，Tab 与 URL 同步
 - **工作台联动**：进行中项目 KPI 与「项目进度」区块接入真实项目数据（进度、负责人、成员规模、我的角色）
 
-**任务执行（Phase 4，v0.1.0 重点）**
+**任务执行**
 
 - **任务工作流**：项目自带默认状态模板（待处理 → 进行中 → 待审核 → 已完成），支持**自定义状态**，但每个状态必须映射系统统一类型（TODO / ACTIVE / REVIEW / DONE / CLOSED），**统计与流程只依赖系统类型，不依赖自定义名称**；状态流允许向前推进与打回 / 重新打开，CLOSED 为终态
-- **负责人体系**：主负责人 × 1（必填）、副负责人 × 0~1、协作成员 × N；权限边界为：主负责人 / 副负责人可改状态、进度、优先级与时间；**副负责人不能修改主负责人**；协作成员可查看、评论（Phase 5）并完成自己负责的子任务
+- **负责人体系**：主负责人 × 1（必填）、副负责人 × 0~1、协作成员 × N；权限边界为：主负责人 / 副负责人可改状态、进度、优先级与时间；**副负责人不能修改主负责人**；协作成员可查看、评论并完成自己负责的子任务
 - **创建与派发**：OWNER / DEPUTY_OWNER 派发立即生效；普通成员指派给他人进入 **PENDING_ASSIGNMENT**，项目负责人审核通过后才正式生效（被指派成员无需再次接受）；被驳回的派发保留记录与审计但不在看板出现
 - **一级子任务**：独立标题 / 负责人 / 状态 / 时间；禁止二级嵌套；支持进度 AUTO 模式（按子任务完成比例自动计算，无子任务时回退手工）
 - **时间自动记录**：首次进入 ACTIVE 记录 `actual_start_at`，首次进入 DONE 记录 `completed_at`（用于后续延期 / 提前完成与周期统计）；手工模式任务首次完成时进度记为 100%
@@ -145,7 +145,7 @@ EasyOA 优先保证：
 - **我的任务**：跨项目聚合我是主负责人 / 副负责人 / 协作成员的任务，支持未完成 / 即将到期 / 已完成 / 全部筛选，点击深链到看板中的任务侧栏
 - **工作台联动**：「我的任务」「即将到期」KPI 与「我的任务」区块接入真实任务数据
 
-**评论与文件（Phase 5）**
+**评论与文件**
 
 - **评论**：任务评论区支持发表 / 一级回复 / @成员（ElMention，仅限项目成员）/ 附件；编辑保留**完整历史**（comment_versions 只追加），作者或项目负责人可查看历史版本
 - **撤回不删除**：撤回后界面显示「某某 撤回了一条评论」，数据库保留原始评论与编辑历史，审计（`COMMENT_WITHDRAWN`）可追踪
@@ -153,19 +153,19 @@ EasyOA 优先保证：
 - **存储与元数据**：磁盘使用 UUID 随机存储名（原始文件名只做元数据），目录分片 + 路径前缀校验防目录遍历；保存 original_name / stored_name / mime_type / size / sha256 / uploader / resource_type / resource_id
 - **上传策略**：大小限制、危险扩展名黑名单（exe / sh / jar 等）、空文件拒绝、文件名清洗（去目录成分与控制字符）；删除为软删除（记录与磁盘文件保留）
 
-**审批（Phase 6）**
+**审批**
 
 - **模板化审批**：模板内容**版本化**（form_schema + node_schema 只追加新版本），新申请使用最新版本，已运行实例始终绑定发起时版本，历史审批不受模板更新影响
 - **自定义审批表单**：TEXT / TEXTAREA / NUMBER / MONEY / DATE / DATETIME / SELECT / MULTI_SELECT / USER / ATTACHMENT；发起时保存 **Template Version + Form Snapshot**
 - **审批实例状态机**：DRAFT → PENDING → APPROVED / REJECTED / RETURNED / CANCELLED；进入 PENDING 后申请人不可修改表单（只能撤回或等待退回）
-- **多人审批**：节点支持 **ANY_ONE**（任一通过）与 **ALL**（全部通过）；v0.1.0 不做 2/3、60% 投票等复杂规则
+- **多人审批**：节点支持 **ANY_ONE**（任一通过）与 **ALL**（全部通过）；当前不做 2/3、60% 投票等复杂规则
 - **动态审批人**：FIXED_USER / DIRECT_MANAGER（沿组织链向上、跳过申请人）/ PRIMARY_DEPT_MANAGER / ORG_UNIT_MANAGER / PROJECT_OWNER / PROJECT_DEPUTY / SYSTEM_ROLE；**发起时解析并生成审批人快照**，组织变化不影响运行中的实例
 - **自我审批禁止**：解析结果过滤申请人本人 → 命中模板覆盖的备用规则 → 系统默认递补链（主部门负责人 → ADMIN → ROOT）；仍无法解析**禁止提交**（「审批流程配置不完整，请联系管理员」），绝不静默跳过节点
 - **退回与重新提交**：审批人退回后申请人修改表单，**从第一个节点重新审批**（禁止从退回节点继续）；拒绝与退回必须填写原因
 - **转交**：仅系统管理员可转交（原审批人 TRANSFERRED_OUT、新审批人快照标记来源），写入 CRITICAL 级审计
 - **审批历史**：approval_actions 只追加，审批详情以业务语言展示流程（申请人 ✓ → 部门负责人 ●审批中 → 财务 ○等待），不暴露技术概念；审批附件走受控下载（认证 → 实例可见性 → 文件权限）
 
-**工作台（Phase 7）**
+**工作台**
 
 - **通知中心**：顶部铃铛 + 未读数（60s 轮询）；任务分配 / 状态变更 / 即将截止 / 逾期、评论 @ 与回复、审批待办 / 通过 / 拒绝 / 退回、加入项目与角色变更全部生成业务通知；**Deep Link 点击直达任务 / 审批 / 项目，不跳回首页**；通知与安全审计分离，只能查看自己的通知
 - **即将截止 / 逾期**：定时扫描（可配置开关与间隔），按「收件人 + 类型 + 任务」未读去重，收件人为主 / 副负责人
@@ -173,7 +173,7 @@ EasyOA 优先保证：
 - **命令面板（⌘K / Ctrl+K）**：导航 + 快捷动作（创建任务 / 创建项目 / 发起审批）+ 内容检索；「创建项目 / 发起审批」直达弹窗，「创建任务」进入项目看板自动打开新建任务
 - **Activity Feed**：工作台「项目动态」为真实业务动态（谁完成任务 / 谁评论任务 / 谁发起与流转审批 / 谁调整任务状态），由业务表 + 状态变更记录实时聚合，只展示自己参与的内容；明确是业务动态而非 Audit Log
 
-**安全（Phase 8）**
+**安全**
 
 - **动态口令（TOTP）**：标准 RFC 6238（HMAC-SHA1 / 30s / 6 位，接受 ±1 时间窗），兼容 Google / Microsoft Authenticator、1Password 等标准 App；自行实现算法（不引入第三方 OTP 依赖）
 - **Secret 安全**：Secret 以 **AES-256-GCM** 加密落库（密钥由 `EASYOA_SESSION_SECRET` 经 SHA-256 派生，密文带 `v1:` 版本前缀）；接口**只在绑定阶段返回一次**明文 Secret 与 `otpauth://` URI，之后任何接口都不再返回，也不写日志
@@ -186,7 +186,7 @@ EasyOA 优先保证：
 - **结构性保障**：安全事件仓储使用自定义只读检索片段（而非 `JpaSpecificationExecutor`，后者会暴露 `delete`），并有专门的边界测试守住「仓储层不存在 delete / update」
 - **登录设备治理**：安全中心展示活跃会话（IP / 客户端 / 最近活动），可单独下线非当前设备
 
-**数据中心（Phase 9）**
+**数据中心**
 
 - **保持克制**：只做 5 组有决策价值的数据——项目健康度、任务完成趋势、逾期任务、成员任务负载、审批效率；**不引入图表库**，趋势用原生 CSS 柱状呈现
 - **项目健康度**：规则简单可解释——计划结束时间已过且未完成 → 已超期（BLOCKED）；存在逾期任务 → 有逾期（AT_RISK）；其余为正常（HEALTHY）
@@ -202,10 +202,6 @@ EasyOA 优先保证：
 - **设计系统**：Easy 系列 Design Tokens（90% 中性色 + 10% Easy Green）、EasyUI 组件层、Element Plus 主题映射
 - **界面框架**：Sidebar / Topbar / 工作台 / 登录 / 初始化 / 命令面板 / 403 / 404
 - **部署与 CI**：Docker Compose（Nginx + Web + API + PostgreSQL）、GitHub Actions（后端测试打包 / 前端类型检查构建 / Compose 校验 / Tag 发布）
-
-### 全部阶段已交付
-
-v0.1.0 计划内的 Phase 0 ~ Phase 9 均已交付；不再有以占位页呈现的未完成模块。
 
 > 规划中但**刻意不做**的能力：OAuth / SSO / LDAP、微服务拆分、Redis、多租户 SaaS、ECharts 报表堆砌。
 
@@ -228,7 +224,7 @@ Internet
 ```
 
 后端采用 **模块化单体（Modular Monolith）**，业务模块内部按 `controller / application / domain /
-repository / dto` 分层；`v0.1.0` 不引入微服务、消息队列、Redis 与 Elasticsearch
+repository / dto` 分层；`v0.1.x` 不引入微服务、消息队列、Redis 与 Elasticsearch
 （无真实需求时不提前引入复杂度）。
 
 | 模块 | 职责 |
@@ -239,14 +235,14 @@ repository / dto` 分层；`v0.1.0` 不引入微服务、消息队列、Redis �
 | `system` | 系统设置、首次初始化 |
 | `audit` | 审计日志（Append Only，查询仅 ADMIN / ROOT） |
 | `securityevent` | 安全事件与哈希链 |
-| `organization` | 组织树、组织归属与主部门、组织负责人（Phase 2 已交付） |
-| `project` | 项目生命周期、项目角色与成员、项目权限（Phase 3 已交付） |
-| `task` | 任务工作流、负责人体系、子任务、依赖与阻塞、看板与任务侧栏（Phase 4 已交付） |
-| `comment` / `file` | 评论（回复 / @ / 编辑历史 / 撤回）与附件（受控下载 / 元数据 / 上传策略）（Phase 5 已交付） |
-| `approval` | 审批模板与版本、动态审批人、ANY_ONE / ALL、退回 / 转交 / 审批历史（Phase 6 已交付） |
-| `notification` / `search` | 通知中心（Deep Link / 未读去重）、全局搜索（分组结果）（Phase 7 已交付） |
-| `security` | TOTP 生命周期、ROOT 高危操作通道（SensitiveOperationService）、安全策略（Phase 8 已交付） |
-| `insights` | 数据中心只读报表层：项目健康度、任务趋势、逾期与负载、审批效率（Phase 9 已交付） |
+| `organization` | 组织树、组织归属与主部门、组织负责人 |
+| `project` | 项目生命周期、项目角色与成员、项目权限 |
+| `task` | 任务工作流、负责人体系、子任务、依赖与阻塞、看板与任务侧栏 |
+| `comment` / `file` | 评论（回复 / @ / 编辑历史 / 撤回）与附件（受控下载 / 元数据 / 上传策略） |
+| `approval` | 审批模板与版本、动态审批人、ANY_ONE / ALL、退回 / 转交 / 审批历史 |
+| `notification` / `search` | 通知中心（Deep Link / 未读去重）、全局搜索（分组结果） |
+| `security` | TOTP 生命周期、ROOT 高危操作通道（SensitiveOperationService）、安全策略 |
+| `insights` | 数据中心只读报表层：项目健康度、任务趋势、逾期与负载、审批效率 |
 
 ---
 
@@ -340,7 +336,7 @@ cd frontend && npm install && npm run dev           # http://localhost:5173
 | `EASYOA_PROFILE` | ➖ | `prod`（默认） / `dev` |
 | `EASYOA_SESSION_TIMEOUT_MINUTES` | ➖ | 会话有效期，默认 480 分钟 |
 | `EASYOA_LOGIN_MAX_FAILURES` / `EASYOA_LOGIN_LOCK_MINUTES` | ➖ | 登录失败限制，默认 5 次 / 15 分钟 |
-| `EASYOA_STORAGE_PATH` | ➖ | 附件存储目录（Phase 5 使用） |
+| `EASYOA_STORAGE_PATH` | ➖ | 附件存储目录（附件上传 / 下载使用） |
 | `EASYOA_HTTP_PORT` / `EASYOA_HTTPS_PORT` | ➖ | 边缘 Nginx 端口，默认 80 / 443 |
 | `EASYOA_TLS_CERT_DIR` | ➖ | 证书目录，默认 `./infra/nginx/certs` |
 
@@ -424,20 +420,12 @@ EasyOA/
 
 ---
 
-## Roadmap
+## Releases
 
-| 阶段 | 内容 | 状态 |
-| ---- | ---- | ---- |
-| Phase 0 | 仓库基建：README / CI / Docker Compose / Nginx / 环境样例 | ✅ 已完成 |
-| Phase 1 | 核心基建：User / Auth / Session / Security / Error / Audit / 初始化 | ✅ 已完成 |
-| Phase 2 | 组织架构：组织树、多组织归属、主部门、团队页面、成员档案 | ✅ 已完成 |
-| Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ✅ 已完成 |
-| Phase 4 | 任务：工作流、子任务、依赖与循环检测、看板、任务侧栏（**v0.1.0 重点**） | ✅ 已完成 |
-| Phase 5 | 评论与文件：回复 / @ / 编辑历史 / 撤回 / 受控下载 | ✅ 已完成 |
-| Phase 6 | 审批：模板版本、表单快照、ANY_ONE / ALL、动态与替补审批人 | ✅ 已完成 |
-| Phase 7 | 工作台：通知中心、全局搜索、命令面板检索、Activity Feed | ✅ 已完成 |
-| Phase 8 | 安全：TOTP、ROOT 高危操作通道、审计视图、安全设置 | ✅ 已完成 |
-| Phase 9 | 洞察：项目健康度、任务趋势、逾期与负载、审批效率 | ✅ 已完成 |
+| 版本 | 内容 |
+| ---- | ---- |
+| **v0.1.1**（当前） | 补齐**安全**（TOTP、ROOT 高危操作通道、审计与安全事件视图、安全设置）与**数据中心**（项目健康度 / 任务趋势 / 逾期与负载 / 审批效率）；修复侧边栏在矮视口下导航末项被页脚遮挡 |
+| v0.1.0 | 首个版本：认证与账号、组织架构、项目协作、任务执行、评论与文件、审批、工作台，以及 Docker Compose / Nginx / CI / Flyway 工程基建 |
 
 ---
 

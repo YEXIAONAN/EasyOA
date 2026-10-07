@@ -4,6 +4,11 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 
+# 官方 maven 镜像会设置 MAVEN_CONFIG=/root/.m2，而 mvnw 会把 MAVEN_CONFIG 原样
+# 作为附加参数传给 Maven（mvnw 末尾 `${WRAPPER_LAUNCHER} $MAVEN_CONFIG "$@"`），
+# 导致报错 "Unknown lifecycle phase "/root/.m2"" —— 因此必须显式清空。
+ENV MAVEN_CONFIG=""
+
 # 先复制依赖描述文件，充分利用 Docker 层缓存
 COPY pom.xml ./
 COPY .mvn ./.mvn

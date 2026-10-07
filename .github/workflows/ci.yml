@@ -128,6 +128,11 @@ jobs:
       - name: Build docker images
         run: docker compose -f docker-compose.yml build
 
+      # 导出包需要 nginx / postgres 基础镜像：它们只有 image: 没有 build:，
+      # `compose build` 不会拉取，必须显式 pull，否则 docker save 会失败。
+      - name: Pull runtime images
+        run: docker compose -f docker-compose.yml pull --ignore-buildable
+
       - name: Export deployment package
         run: |
           mkdir -p release

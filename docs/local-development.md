@@ -31,8 +31,21 @@ cd backend
 
 - 默认激活 `dev` profile（`application-dev.yml`）；
 - Flyway 会在启动时自动执行迁移（`src/main/resources/db/migration`）；
-- 首次启动会注入演示账号：`root` / `admin` / `member`，初始密码 `EasyOA@2026`；
+- 首次启动会注入演示数据（见下表）；无需演示数据时设置 `EASYOA_DEV_SEED=false`；
 - 接口文档：<http://localhost:8080/swagger-ui.html>。
+
+### 演示数据（仅 dev profile）
+
+| 账号 | 密码 | 角色 | 职位 |
+| ---- | ---- | ---- | ---- |
+| `root` | `EasyOA@2026` | ROOT | 系统负责人 |
+| `admin` | `EasyOA@2026` | ADMIN | 运维管理员 |
+| `member` | `EasyOA@2026` | MEMBER | 后端工程师 |
+| `kevin` | `EasyOA@2026` | MEMBER | 前端工程师 |
+| `linda` | `EasyOA@2026` | MEMBER | 产品经理 |
+
+组织树：`技术部`（负责人 admin）→ `后端组`（member）/ `前端组`（kevin）；`产品部`（linda）；`Zero Lab`（root）。
+组织归属按「主部门 + 兼任」安排，可直接用于验证团队页面与组织架构页面。
 
 常用命令：
 
@@ -72,10 +85,11 @@ npm run preview              # 预览构建产物
 
 | 场景 | 操作 |
 | ---- | ---- |
-| 首次初始化 | 清空数据库后访问 <http://localhost:5173/setup> |
-| 重置初始化状态 | `docker compose -f docker-compose.dev.yml down -v` 后重新启动 |
+| 首次初始化 | 清空数据库后访问 <http://localhost:5173/setup>（或 `EASYOA_DEV_SEED=false` 启动后端） |
+| 重置环境（含演示数据） | `docker compose -f docker-compose.dev.yml down -v` 后重新启动后端 |
 | 命令面板 | `⌘K`（macOS）/ `Ctrl+K` |
 | 查看审计数据 | `GET /api/audit-logs`（需 ADMIN / ROOT 登录态） |
+| 组织与成员 | `/organization`、`/team`；接口 `GET /api/org-units`、`GET /api/users/directory` |
 
 ## 6. 目录约定
 

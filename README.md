@@ -52,20 +52,39 @@ EasyOA 优先保证：
 | ------ | ----------------------------- |
 | ![登录页](docs/screenshots/login.png) | 未交付模块统一以空状态呈现，不使用假数据 |
 
-> 以上截图取自本地真实运行界面（Phase 1 交付版本，数据为真实数据：账号、会话与审计均已生效）。
+| 团队（成员目录 + 档案侧栏） | 组织架构（组织树 + 成员管理） |
+| --------------------------- | ----------------------------- |
+| ![团队](docs/screenshots/team.png) | ![组织架构](docs/screenshots/organization.png) |
+
+> 以上截图取自本地真实运行界面（Phase 2 交付版本，数据为真实数据：账号、会话、组织与审计均已生效）。
 
 ---
 
 ## Features
 
-### v0.1.0 已交付（Phase 0 ~ Phase 1）
+### v0.1.0 已交付（Phase 0 ~ Phase 2）
+
+**账号与安全**
 
 - **账号与认证**：Session Cookie（HttpOnly + Secure + SameSite）认证，BCrypt 哈希，密码强度策略
 - **安全防护**：CSRF 双提交校验（防 BREACH 的 XOR 编码）、登录失败限制与临时锁定、Session Fixation 防护
 - **会话治理**：会话记录使用 HMAC 签名存储（数据库不存原始 Session ID）、登录设备列表与撤销、改密即踢出其他设备
 - **首次初始化**：`/setup` 一次性创建组织与 ROOT，完成后永久关闭（数据库原子开关保证不可重放）
 - **审计基础设施**：审计日志与安全事件 Append Only（仓储层不暴露 update/delete），哈希链预留
-- **工程基建**：统一 API 响应、统一异常处理、RequestId 全链路、结构化访问日志、Flyway 迁移、OpenAPI 文档
+
+**组织与成员（Phase 2）**
+
+- **组织架构**：部门 / 团队两级类型，邻接表组织树，`WITH RECURSIVE` 子树查询，**移动防成环**
+- **组织生命周期**：使用归档（ARCHIVED）而非删除；存在未归档下级时禁止归档；支持恢复
+- **组织负责人**：单元负责人可管理本单位（含下级）成员；同时是 Phase 6 审批人解析（DIRECT_MANAGER / ORG_UNIT_MANAGER）的来源
+- **成员多组织归属**：一个用户可属于多个部门 / 团队；**主部门唯一**（数据库 Partial Unique Index 兜底，首个归属自动成为主部门，移除主部门自动递补）
+- **成员目录**：卡片式团队页面，支持关键字 / 组织（自动含下级）/ 状态筛选与分页
+- **成员档案**：右侧侧栏展示组织归属、职位、联系方式（**按权限过滤**：本人 / 管理员 / 所在组织负责人可见）
+- **账号管理**：创建成员（ADMIN 仅能创建 MEMBER，创建管理员需 ROOT）、启用禁用、角色变更；**禁用或改角色即刻撤销其全部会话**；系统始终保留至少一个 ROOT
+
+**工程基建**
+
+- 统一 API 响应、统一异常处理、RequestId 全链路、结构化访问日志、Flyway 迁移、OpenAPI 文档
 - **设计系统**：Easy 系列 Design Tokens（90% 中性色 + 10% Easy Green）、EasyUI 组件层、Element Plus 主题映射
 - **界面框架**：Sidebar / Topbar / 工作台 / 登录 / 初始化 / 命令面板 / 403 / 404
 - **部署与 CI**：Docker Compose（Nginx + Web + API + PostgreSQL）、GitHub Actions（后端测试打包 / 前端类型检查构建 / Compose 校验 / Tag 发布）
@@ -103,12 +122,13 @@ repository / dto` 分层；`v0.1.0` 不引入微服务、消息队列、Redis �
 | ---- | ---- |
 | `common` | 统一响应、异常、RequestId、结构化日志、安全配置、工具 |
 | `auth` | 登录、登出、会话、登录失败限制、密码策略 |
-| `user` | 用户主数据与档案 |
+| `user` | 用户主数据、成员目录、成员档案、账号管理 |
 | `system` | 系统设置、首次初始化 |
 | `audit` | 审计日志（Append Only，查询仅 ADMIN / ROOT） |
 | `securityevent` | 安全事件与哈希链 |
+| `organization` | 组织树、组织归属与主部门、组织负责人（Phase 2 已交付） |
 | `workspace` | 工作台聚合 |
-| `organization` / `project` / `task` / `approval` / `notification` / `file` | 目录骨架已就位，按 Phase 2~6 交付 |
+| `project` / `task` / `approval` / `notification` / `file` | 目录骨架已就位，按 Phase 3~6 交付 |
 
 ---
 
@@ -280,8 +300,8 @@ EasyOA/
 | ---- | ---- | ---- |
 | Phase 0 | 仓库基建：README / CI / Docker Compose / Nginx / 环境样例 | ✅ 已完成 |
 | Phase 1 | 核心基建：User / Auth / Session / Security / Error / Audit / 初始化 | ✅ 已完成 |
-| Phase 2 | 组织架构：组织树、多组织归属、主部门、团队页面 | ⏳ 下一步 |
-| Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ⏳ |
+| Phase 2 | 组织架构：组织树、多组织归属、主部门、团队页面、成员档案 | ✅ 已完成 |
+| Phase 3 | 项目：生命周期、OWNER / DEPUTY / MEMBER、项目权限与概览 | ⏳ 下一步 |
 | Phase 4 | 任务：工作流、子任务、依赖与循环检测、看板、任务侧栏（**v0.1.0 重点**） | ⏳ |
 | Phase 5 | 评论与文件：回复 / @ / 编辑历史 / 撤回 / 受控下载 | ⏳ |
 | Phase 6 | 审批：模板版本、表单快照、ANY_ONE / ALL、动态与替补审批人 | ⏳ |

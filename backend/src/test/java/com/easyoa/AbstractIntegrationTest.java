@@ -92,10 +92,16 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected PasswordEncoder passwordEncoder;
 
+    @Autowired
+    protected org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     private String cachedCsrfToken;
 
     @BeforeEach
     void resetSystemState() {
+        // 组织数据使用原生 SQL 清理：org_units 自引用外键（on delete cascade）无法通过实体逐行删除
+        jdbcTemplate.execute("delete from user_org_memberships");
+        jdbcTemplate.execute("delete from org_units");
         userSessionRepository.deleteAll();
         loginAttemptRepository.deleteAll();
         userRepository.deleteAll();
@@ -158,6 +164,51 @@ public abstract class AbstractIntegrationTest {
             throw new IllegalStateException("登录失败，未创建会话：" + result.getResponse().getContentAsString());
         }
         return session;
+    }
+
+    /** 通过真实接口创建组织单元，返回单元 ID。 */
+    protected Long createUnitViaApi(MockHttpSession session, String name, String type, Long parentId)
+            throws Exception {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("name", name);
+        body.put("type", type);
+        if (parentId != null) {
+            body.put("parentId", parentId);
+        }
+        MvcResult result = mockMvc
+                .perform(post("/api/org-units")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+    }
+
+    /** 通过真实接口创建成员，返回用户 ID。 */
+    protected Long createUserViaApi(MockHttpSession session, String username, String displayName,
+            String systemRole, String email, String phone) throws Exception {
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("username", username);
+        body.put("displayName", displayName);
+        body.put("systemRole", systemRole);
+        body.put("initialPassword", DEFAULT_PASSWORD);
+        if (email != null) {
+            body.put("email", email);
+        }
+        if (phone != null) {
+            body.put("phone", phone);
+        }
+        MvcResult result = mockMvc
+                .perform(post("/api/users")
+                        .session(session)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(body)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
     }
 
     protected String json(Object value) throws Exception {

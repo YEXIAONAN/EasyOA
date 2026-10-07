@@ -62,6 +62,10 @@ public class User {
     @Column(length = 32)
     private String phone;
 
+    /** 职位（例如：后端工程师 / 产品经理），由管理员维护。 */
+    @Column(name = "job_title", length = 64)
+    private String jobTitle;
+
     @Column(length = 500)
     private String bio;
 
@@ -174,6 +178,10 @@ public class User {
         return phone;
     }
 
+    public String getJobTitle() {
+        return jobTitle;
+    }
+
     public String getBio() {
         return bio;
     }
@@ -218,6 +226,10 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public void setJobTitle(String jobTitle) {
+        this.jobTitle = jobTitle;
     }
 
     public void setBio(String bio) {

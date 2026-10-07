@@ -69,3 +69,136 @@ export interface WorkspaceSummary {
     dueSoonTasks: number
   }
 }
+
+// ---------------------------------------------------------------------------
+// 组织与成员（Phase 2）
+// ---------------------------------------------------------------------------
+
+export type OrgUnitType = 'DEPARTMENT' | 'TEAM'
+export type OrgUnitStatus = 'ACTIVE' | 'ARCHIVED'
+export type UserStatus = 'ACTIVE' | 'DISABLED'
+
+export interface UserBrief {
+  id: number
+  username: string
+  displayName: string
+  avatarUrl?: string
+  jobTitle?: string
+  systemRole: SystemRole
+  status: UserStatus
+}
+
+export interface OrgUnitBrief {
+  id: number
+  name: string
+  type: OrgUnitType
+  status: OrgUnitStatus
+}
+
+export interface OrgUnitTreeNode extends OrgUnitBrief {
+  parentId: number | null
+  sortOrder: number
+  depth: number
+  manager?: UserBrief
+  memberCount: number
+  children: OrgUnitTreeNode[]
+}
+
+export interface OrgUnitDetail {
+  id: number
+  parentId: number | null
+  parentName?: string
+  name: string
+  type: OrgUnitType
+  status: OrgUnitStatus
+  sortOrder: number
+  manager?: UserBrief
+  memberCount: number
+}
+
+export interface OrgMember {
+  userId: number
+  username: string
+  displayName: string
+  avatarUrl?: string
+  jobTitle?: string
+  systemRole: SystemRole
+  status: UserStatus
+  primary: boolean
+  joinedAt: string
+}
+
+export interface UserOrgMembershipView {
+  orgUnit: OrgUnitBrief
+  primary: boolean
+  joinedAt: string
+}
+
+export interface MemberCard {
+  id: number
+  username: string
+  displayName: string
+  avatarUrl?: string
+  jobTitle?: string
+  systemRole: SystemRole
+  status: UserStatus
+  primaryOrgUnit?: OrgUnitBrief
+  orgUnitCount: number
+  joinedAt: string
+}
+
+export interface MemberContact {
+  email?: string
+  phone?: string
+}
+
+export interface MemberProfile {
+  id: number
+  username: string
+  displayName: string
+  avatarUrl?: string
+  jobTitle?: string
+  systemRole: SystemRole
+  status: UserStatus
+  bio?: string
+  primaryOrgUnit?: OrgUnitBrief
+  orgUnits: UserOrgMembershipView[]
+  contactVisible: boolean
+  contact?: MemberContact
+  lastLoginAt?: string
+  createdAt: string
+}
+
+export interface CreateOrgUnitPayload {
+  name: string
+  type: OrgUnitType
+  parentId?: number | null
+  sortOrder?: number
+  managerUserId?: number | null
+}
+
+export interface UpdateOrgUnitPayload {
+  name: string
+  type: OrgUnitType
+  sortOrder?: number
+  managerUserId?: number | null
+}
+
+export interface CreateUserPayload {
+  username: string
+  displayName: string
+  jobTitle?: string
+  email?: string
+  phone?: string
+  systemRole: SystemRole
+  initialPassword: string
+  orgUnitId?: number | null
+}
+
+export interface UpdateMyProfilePayload {
+  displayName: string
+  email?: string
+  phone?: string
+  bio?: string
+  avatarUrl?: string
+}

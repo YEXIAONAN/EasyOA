@@ -67,22 +67,14 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'team',
         name: 'team',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '团队',
-          phase: 'Phase 2',
-          summary: '成员目录、成员卡片与个人主页将在 Phase 2 交付。',
-        },
+        component: () => import('@/views/TeamView.vue'),
+        meta: { title: '团队' },
       },
       {
         path: 'organization',
         name: 'organization',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '组织架构',
-          phase: 'Phase 2',
-          summary: '组织树、多组织归属与主部门设置将在 Phase 2 交付。',
-        },
+        component: () => import('@/views/OrganizationView.vue'),
+        meta: { title: '组织架构' },
       },
       {
         path: 'insights',

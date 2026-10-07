@@ -5,6 +5,9 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -114,6 +117,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAuthentication(AuthenticationException ex) {
         return ResponseEntity.status(ErrorCode.UNAUTHENTICATED.httpStatus())
                 .body(ApiResponse.error(ErrorCode.UNAUTHENTICATED.name(), ErrorCode.UNAUTHENTICATED.defaultMessage()));
+    }
+
+    /** 唯一约束 / 外键约束冲突：转换为 409，避免把数据库错误暴露为 500。 */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("数据完整性约束冲突 path={} message={}", RequestContext.path(), ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(ErrorCode.CONFLICT.httpStatus())
+                .body(ApiResponse.error(ErrorCode.CONFLICT.name(), "操作与当前数据状态冲突，请刷新后重试"));
+    }
+
+    /** 并发修改冲突（乐观锁 / 悲观锁）。 */
+    @ExceptionHandler({ OptimisticLockingFailureException.class, PessimisticLockingFailureException.class })
+    public ResponseEntity<ApiResponse<Void>> handleConcurrentModification(Exception ex) {
+        log.warn("并发修改冲突 path={} type={}", RequestContext.path(), ex.getClass().getSimpleName());
+        return ResponseEntity.status(ErrorCode.CONFLICT.httpStatus())
+                .body(ApiResponse.error(ErrorCode.CONFLICT.name(), "数据已被其他人修改，请刷新后重试"));
     }
 
     /** 兜底：未预期异常。对外只返回统一文案，内部记录完整堆栈用于排查。 */

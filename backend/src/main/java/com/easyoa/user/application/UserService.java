@@ -1,7 +1,10 @@
 package com.easyoa.user.application;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +13,7 @@ import com.easyoa.common.exception.ApiException;
 import com.easyoa.common.exception.ErrorCode;
 import com.easyoa.user.domain.SystemRole;
 import com.easyoa.user.domain.User;
+import com.easyoa.user.dto.UserBrief;
 import com.easyoa.user.dto.UserProfileResponse;
 import com.easyoa.user.repository.UserRepository;
 
@@ -43,6 +47,21 @@ public class UserService {
     @Transactional(readOnly = true)
     public long countUsers() {
         return userRepository.countAllUsers();
+    }
+
+    /** 批量获取用户简要信息（跨模块展示用，避免 N+1）。 */
+    @Transactional(readOnly = true)
+    public Map<Long, UserBrief> findBriefs(Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, UserBrief::from));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserBrief> findBrief(Long userId) {
+        return userRepository.findById(userId).map(UserBrief::from);
     }
 
     /**

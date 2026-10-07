@@ -23,13 +23,18 @@ public final class AuditActions {
     public static final String SETUP_INITIALIZED = "SETUP_INITIALIZED";
     public static final String SYSTEM_SETTING_UPDATED = "SYSTEM_SETTING_UPDATED";
 
-    // --- 用户 / 组织（Phase 2 起使用） ---
+    // --- 用户 / 组织（Phase 2） ---
     public static final String USER_CREATED = "USER_CREATED";
     public static final String USER_ROLE_CHANGED = "USER_ROLE_CHANGED";
     public static final String USER_DISABLED = "USER_DISABLED";
+    public static final String USER_ENABLED = "USER_ENABLED";
+    public static final String USER_PROFILE_UPDATED = "USER_PROFILE_UPDATED";
     public static final String ORG_UNIT_CREATED = "ORG_UNIT_CREATED";
     public static final String ORG_UNIT_UPDATED = "ORG_UNIT_UPDATED";
+    public static final String ORG_UNIT_ARCHIVED = "ORG_UNIT_ARCHIVED";
+    public static final String ORG_UNIT_RESTORED = "ORG_UNIT_RESTORED";
     public static final String ORG_MEMBERSHIP_CHANGED = "ORG_MEMBERSHIP_CHANGED";
+    public static final String ORG_PRIMARY_CHANGED = "ORG_PRIMARY_CHANGED";
 
     // --- 项目（Phase 3 起使用） ---
     public static final String PROJECT_CREATED = "PROJECT_CREATED";

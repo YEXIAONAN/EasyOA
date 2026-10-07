@@ -3,22 +3,31 @@ import type { Component } from 'vue'
 import EasyAvatar from './EasyAvatar.vue'
 import EasyButton from './EasyButton.vue'
 import EasyDialog from './EasyDialog.vue'
+import EasyDrawer from './EasyDrawer.vue'
 import EasyEmpty from './EasyEmpty.vue'
 import EasyInput from './EasyInput.vue'
+import EasySelect from './EasySelect.vue'
+import EasyStatus from './EasyStatus.vue'
+import { confirmAction } from './easyConfirm'
 
 /**
  * EasyOA 设计系统组件出口。
  *
- * v0.1.0 Phase 1 交付：Button / Input / Avatar / Empty / Dialog（均已有真实使用场景）。
- * EasySelect / EasyTable / EasyStatus / EasyDrawer / EasyMemberPicker / EasyConfirm
- * 将随其消费方模块（Phase 3/4/5）一起交付，避免产生无使用方的空抽象。
+ * Phase 1：Button / Input / Avatar / Empty / Dialog
+ * Phase 2：Drawer（成员档案） / Select（筛选与表单） / Status（状态标签） / Confirm（危险操作）
+ *
+ * EasyTable / EasyMemberPicker 将随其消费方模块（Phase 3/4）交付。
  */
 export const easyComponents: Record<string, Component> = {
   EasyAvatar,
   EasyButton,
   EasyDialog,
+  EasyDrawer,
   EasyEmpty,
   EasyInput,
+  EasySelect,
+  EasyStatus,
 }
 
-export { EasyAvatar, EasyButton, EasyDialog, EasyEmpty, EasyInput }
+export { confirmAction, EasyAvatar, EasyButton, EasyDialog, EasyDrawer, EasyEmpty, EasyInput, EasySelect, EasyStatus }
+export type { ConfirmOptions } from './easyConfirm'

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { useId } from 'vue'
+import { computed, useAttrs, useId } from 'vue'
 
 /**
  * EasyInput — 带标签 / 提示 / 错误态的输入框。
- * 支持 v-model 与透传 Element Plus 输入属性（如 show-password、placeholder、autocomplete）。
+ *
+ * 注意：class / style 保留在组件根元素上，保证调用方的 scoped 样式（宽度等）生效；
+ * 其余属性（placeholder / show-password / autocomplete 等）透传给 el-input。
  */
 withDefaults(
   defineProps<{
@@ -19,15 +21,29 @@ defineOptions({ inheritAttrs: false })
 
 const model = defineModel<string>({ default: '' })
 const inputId = useId()
+
+const attrs = useAttrs()
+const rootClass = computed(() => attrs.class ?? null)
+const rootStyle = computed(() => attrs.style ?? null)
+
+const inputAttrs = computed(() => {
+  const rest: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key !== 'class' && key !== 'style') {
+      rest[key] = value
+    }
+  }
+  return rest
+})
 </script>
 
 <template>
-  <div class="easy-field" :class="{ 'easy-field--invalid': !!error }">
+  <div class="easy-field" :class="[rootClass, { 'easy-field--invalid': !!error }]" :style="rootStyle">
     <label v-if="label" class="easy-field__label" :for="inputId">
       {{ label }}
       <em v-if="required" aria-hidden="true">*</em>
     </label>
-    <el-input :id="inputId" v-model="model" v-bind="$attrs" />
+    <el-input :id="inputId" v-model="model" v-bind="inputAttrs" />
     <span v-if="error" class="easy-field__error" role="alert">{{ error }}</span>
     <span v-else-if="hint" class="easy-field__hint">{{ hint }}</span>
   </div>

@@ -86,12 +86,8 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'insights',
         name: 'insights',
-        component: () => import('@/views/ModulePlaceholderView.vue'),
-        meta: {
-          title: '数据中心',
-          phase: 'Phase 9',
-          summary: '项目健康度、任务趋势、逾期与负载分析将在 Phase 9 交付。',
-        },
+        component: () => import('@/views/InsightsView.vue'),
+        meta: { title: '数据中心' },
       },
       {
         path: 'audit-logs',

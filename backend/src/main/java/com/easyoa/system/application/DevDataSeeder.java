@@ -224,6 +224,10 @@ public class DevDataSeeder implements ApplicationRunner {
         Task mobile = seedTask(project, todo, "移动端适配调研", "响应式布局与移动端交互调研。",
                 TaskPriority.LOW, product, null, ProgressMode.MANUAL, 0,
                 now.plus(14, ChronoUnit.DAYS), now.plus(21, ChronoUnit.DAYS), root);
+        // 逾期示例：数据中心需要真实逾期数据才能展示「项目健康度 / 逾期任务 / 成员负载」
+        seedTask(project, active, "审计日志检索优化", "审计检索条件、风险级别过滤与敏感数据导出。",
+                TaskPriority.HIGH, root, null, ProgressMode.MANUAL, 40,
+                now.minus(25, ChronoUnit.DAYS), now.minus(3, ChronoUnit.DAYS), root);
 
         // 前置依赖（未完成 → 看板卡片显示 BLOCKED）
         taskDependencyRepository.save(new TaskDependency(approval, taskModule, root.getId()));

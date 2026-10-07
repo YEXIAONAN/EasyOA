@@ -758,3 +758,69 @@ export interface SecurityEventItem {
   entryHash?: string | null
   createdAt: string
 }
+
+// ---------------------------------------------------------------------------
+// 数据中心（Phase 9）
+// ---------------------------------------------------------------------------
+
+/** ALL：管理员看全局；MY_PROJECTS：成员只看自己参与的项目 */
+export type InsightScope = 'ALL' | 'MY_PROJECTS'
+export type ProjectHealthLevel = 'HEALTHY' | 'AT_RISK' | 'BLOCKED'
+
+export interface ProjectHealthItem {
+  projectId: number
+  name: string
+  status: ProjectStatus
+  progress: number
+  plannedEndAt?: string | null
+  totalTasks: number
+  doneTasks: number
+  overdueTasks: number
+  health: ProjectHealthLevel
+}
+
+/** 任务趋势时间桶（按周，周一为起点） */
+export interface TaskTrendPoint {
+  weekStart: string
+  createdCount: number
+  completedCount: number
+}
+
+export interface OverdueTaskItem {
+  taskId: number
+  title: string
+  projectId: number
+  projectName: string
+  primaryAssignee: string
+  plannedEndAt?: string | null
+  progress: number
+  overdueDays: number
+}
+
+export interface WorkloadItem {
+  userId: number
+  displayName: string
+  openTasks: number
+  overdueTasks: number
+}
+
+export interface ApprovalEfficiency {
+  pending: number
+  approved: number
+  rejected: number
+  returned: number
+  finishedCount: number
+  averageHours?: number | null
+  approvedRate?: number | null
+  lastFinishedAt?: string | null
+}
+
+export interface InsightsOverview {
+  scope: InsightScope
+  generatedAt: string
+  projectHealth: ProjectHealthItem[]
+  taskTrend: TaskTrendPoint[]
+  overdueTasks: OverdueTaskItem[]
+  workload: WorkloadItem[]
+  approvalEfficiency: ApprovalEfficiency
+}

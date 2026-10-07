@@ -48,9 +48,9 @@ EasyOA 优先保证：
 | ------ | ----------------------- |
 | ![工作台](docs/screenshots/workspace.png) | ![命令面板](docs/screenshots/command-palette.png) |
 
-| 登录页 | 模块占位页（明确标注交付阶段） |
-| ------ | ----------------------------- |
-| ![登录页](docs/screenshots/login.png) | 未交付模块统一以空状态呈现，不使用假数据 |
+| 登录页 | 我的任务（跨项目 + 未完成 / 即将到期 / 已完成） |
+| ------ | ---------------------------------------------- |
+| ![登录页](docs/screenshots/login.png) | ![我的任务](docs/screenshots/my-tasks.png) |
 
 | 团队（成员目录 + 档案侧栏） | 组织架构（组织树 + 成员管理） |
 | --------------------------- | ----------------------------- |
@@ -401,8 +401,10 @@ EasyOA/
 │   │   ├── auth/                  # 认证与会话
 │   │   ├── user/  system/         # 用户主数据 / 系统设置与初始化
 │   │   ├── audit/ securityevent/  # 审计与安全事件（Append Only）
+│   │   ├── security/              # TOTP、ROOT 高危操作通道、安全策略
+│   │   ├── insights/              # 数据中心（只读报表层）
 │   │   ├── workspace/             # 工作台聚合
-│   │   └── organization/ project/ task/ approval/ notification/ file/   # 分阶段交付
+│   │   └── organization/ project/ task/ approval/ comment/ notification/ file/
 │   ├── src/main/resources/db/migration/   # Flyway 迁移脚本
 │   └── src/test/java/             # 单元测试 + Testcontainers 集成测试
 ├── frontend/                      # Vue 3 + TypeScript 应用
@@ -412,7 +414,7 @@ EasyOA/
 │       ├── layouts/               # Sidebar / Topbar / 主框架
 │       ├── router/  stores/       # 路由（含守卫）与 Pinia 状态
 │       ├── styles/                # Design Tokens / 基础样式 / Element 主题映射
-│       └── views/                 # 登录 / 初始化 / 工作台 / 占位页 / 403 / 404
+│       └── views/                 # 登录 / 初始化 / 工作台 / 安全中心 / 数据中心 / 审计 / 403 / 404
 ├── infra/nginx/                   # 边缘 Nginx 配置与证书目录
 ├── scripts/                       # 运维脚本（自签名证书等）
 ├── docs/                          # 部署与开发文档、截图、Logo

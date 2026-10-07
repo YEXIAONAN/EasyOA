@@ -8,10 +8,11 @@ import EasyAvatar from '@/components/easy/EasyAvatar.vue'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyDialog from '@/components/easy/EasyDialog.vue'
 import EasyDrawer from '@/components/easy/EasyDrawer.vue'
-import EasyEmpty from '@/components/easy/EasyEmpty.vue'
 import EasyInput from '@/components/easy/EasyInput.vue'
 import EasySelect from '@/components/easy/EasySelect.vue'
 import EasyStatus from '@/components/easy/EasyStatus.vue'
+import TaskAttachments from '@/components/task/TaskAttachments.vue'
+import TaskComments from '@/components/task/TaskComments.vue'
 import { useNotificationStore } from '@/stores/notification'
 import { formatDate, formatDateTime, toDateInputValue, toIsoInstant } from '@/utils/format'
 import { progressModeLabel, taskPriorityLabel, taskPriorityTone, taskStatusTypeTone } from '@/utils/task'
@@ -26,6 +27,8 @@ const props = defineProps<{
   taskId: number
   projectId: number
   members: ProjectMemberView[]
+  /** 项目已归档：任务与评论 / 附件均为只读 */
+  archived: boolean
 }>()
 
 const emit = defineEmits<{
@@ -605,14 +608,27 @@ const isRejected = computed(() => detail.value?.assignmentState === 'REJECTED')
         </template>
       </section>
 
-      <!-- 评论与附件：Phase 5 -->
+      <!-- 评论（Phase 5：回复 / @成员 / 编辑历史 / 撤回） -->
       <section class="detail-section">
         <div class="detail-section__head"><span class="detail-section__title">评论</span></div>
-        <EasyEmpty compact title="评论将在 Phase 5 交付" phase="Phase 5" description="评论、回复、@成员与编辑历史将在 Phase 5 交付。" />
+        <TaskComments
+          :task-id="detail.id"
+          :members="members"
+          :can-view-history="detail.permissions.canViewCommentHistory"
+          :read-only="archived"
+          @changed="emit('changed')"
+        />
       </section>
+
+      <!-- 附件（Phase 5：上传 / 受控下载 / 软删除） -->
       <section class="detail-section">
         <div class="detail-section__head"><span class="detail-section__title">附件</span></div>
-        <EasyEmpty compact title="附件将在 Phase 5 交付" phase="Phase 5" description="文件上传、权限下载与附件元数据将在 Phase 5 交付。" />
+        <TaskAttachments
+          :task-id="detail.id"
+          :can-manage="detail.permissions.canManage"
+          :read-only="archived"
+          @changed="emit('changed')"
+        />
       </section>
 
       <p class="detail-footer">最近更新：{{ formatDateTime(detail.updatedAt) }}</p>

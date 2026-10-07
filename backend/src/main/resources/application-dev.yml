@@ -16,6 +16,9 @@ easyoa:
   dev-seed:
     # 需要验证「首次初始化 /setup」流程时设为 false，跳过演示账号注入
     enabled: ${EASYOA_DEV_SEED:true}
+  storage:
+    # 本地开发默认写入项目目录（生产由 EASYOA_STORAGE_PATH 指定）
+    path: ${EASYOA_STORAGE_PATH:./storage/files}
 
 logging:
   level:

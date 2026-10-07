@@ -349,6 +349,8 @@ export interface TaskDetailPermissions {
   canManageDependencies: boolean
   canManageCollaborators: boolean
   canReviewAssignment: boolean
+  /** 是否可查看任务下所有评论的编辑历史（作者本人、项目负责人或系统管理员） */
+  canViewCommentHistory: boolean
 }
 
 export interface TaskDetail {
@@ -408,4 +410,55 @@ export interface UpdateTaskPayload {
   plannedStartAt?: string
   plannedEndAt?: string
   progressMode?: ProgressMode
+}
+
+// ---------------------------------------------------------------------------
+// 评论与文件（Phase 5）
+// ---------------------------------------------------------------------------
+
+export type FileResourceType = 'TASK' | 'COMMENT'
+
+/** 附件元数据（统一下载入口 /api/files/{id}，禁止作为公开静态资源） */
+export interface FileMeta {
+  id: number
+  originalName: string
+  mimeType: string
+  size: number
+  sha256: string
+  uploaderId: number
+  uploaderName: string
+  resourceType: FileResourceType
+  resourceId: number
+  downloadUrl: string
+  createdAt: string
+}
+
+/** 评论（顶层评论携带一级回复；撤回时 content 不返回，显示撤回占位） */
+export interface CommentView {
+  id: number
+  taskId: number
+  parentId?: number | null
+  author: TaskUserBrief
+  content?: string | null
+  withdrawn: boolean
+  edited: boolean
+  mentions: TaskUserBrief[]
+  attachments: FileMeta[]
+  replies: CommentView[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CommentVersionView {
+  versionNo: number
+  content: string
+  editor?: TaskUserBrief | null
+  createdAt: string
+}
+
+export interface CreateCommentPayload {
+  content: string
+  parentId?: number | null
+  mentionUserIds?: number[]
+  attachmentFileIds?: number[]
 }

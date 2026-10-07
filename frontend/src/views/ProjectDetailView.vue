@@ -896,6 +896,7 @@ watch(activeTab, (tab) => {
         :task-id="openTaskId"
         :project-id="projectId"
         :members="detail.members"
+        :archived="isArchived"
         @close="closeTask"
         @changed="onTaskChanged"
         @open-task="openTask"

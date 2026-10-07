@@ -550,6 +550,8 @@ public class TaskService {
         boolean canReview = task.isPendingAssignment() && myRole != null && myRole.isManagement();
         boolean canEditProgress = canManage
                 && (task.getProgressMode() == ProgressMode.MANUAL || subtasks.isEmpty());
+        boolean canViewCommentHistory = actor.systemRole().isAdminLike()
+                || (myRole != null && myRole.isManagement());
 
         return new TaskDetailResponse(
                 task.getId(),
@@ -578,7 +580,7 @@ public class TaskService {
                 task.getCreatedAt(),
                 task.getUpdatedAt(),
                 new TaskDetailResponse.Permissions(canManage, canFullControl, canEditProgress, canManage, canManage,
-                        canReview));
+                        canReview, canViewCommentHistory));
     }
 
     private String parentTitle(Task task) {

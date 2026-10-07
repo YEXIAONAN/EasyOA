@@ -28,6 +28,9 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/coverage/
 frontend/.vite/
+
+# 本地开发附件存储（生产使用独立卷 / 目录）
+storage/
 frontend/*.tsbuildinfo
 npm-debug.log*
 yarn-error.log*

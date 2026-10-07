@@ -47,7 +47,9 @@ public record TaskDetailResponse(
             boolean canEditProgress,
             boolean canManageDependencies,
             boolean canManageCollaborators,
-            boolean canReviewAssignment) {
+            boolean canReviewAssignment,
+            /** 是否可查看任务下所有评论的编辑历史（作者本人、项目负责人或系统管理员）。 */
+            boolean canViewCommentHistory) {
     }
 
     /** 前置依赖视图（用于展示与「忽略依赖并开始」弹窗）。 */

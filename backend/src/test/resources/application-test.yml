@@ -10,6 +10,10 @@ easyoa:
     session-secret: integration-test-session-secret-not-for-production-32
     login-max-failures: 5
     login-lock-minutes: 15
+  storage:
+    # 附件写入临时目录；大小限制调小便于测试「超限拒绝」
+    path: ${java.io.tmpdir}/easyoa-test-storage
+    max-file-size: 1048576
 
 logging:
   level:

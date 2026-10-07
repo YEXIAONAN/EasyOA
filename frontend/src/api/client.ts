@@ -71,6 +71,23 @@ http.interceptors.response.use(
 /** 发起请求并解包 ApiResponse */
 export async function apiRequest<T>(config: AxiosRequestConfig): Promise<T> {
   const { data } = await http.request<ApiEnvelope<T>>(config)
+  return unwrap(data)
+}
+
+/**
+ * 上传（multipart/form-data）。
+ *
+ * 显式将 Content-Type 置空：交给浏览器/axios 依据 FormData 自动生成带 boundary 的
+ * multipart 请求头（实例默认的 application/json 不能用于文件上传）。
+ */
+export async function apiUpload<T>(url: string, form: FormData): Promise<T> {
+  const { data } = await http.post<ApiEnvelope<T>>(url, form, {
+    headers: { 'Content-Type': undefined },
+  })
+  return unwrap(data)
+}
+
+function unwrap<T>(data: ApiEnvelope<T>): T {
   if (!data || typeof data !== 'object' || !('success' in data)) {
     throw new ApiError('INVALID_RESPONSE', '服务返回了无法识别的数据')
   }

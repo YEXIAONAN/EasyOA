@@ -8,13 +8,19 @@ import java.util.HexFormat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.easyoa.common.requestid.RequestContext;
+import com.easyoa.common.response.PageResponse;
 import com.easyoa.common.security.SecurityUser;
 import com.easyoa.securityevent.domain.SecurityEvent;
 import com.easyoa.securityevent.domain.SecurityEventType;
+import com.easyoa.securityevent.dto.SecurityEventQuery;
+import com.easyoa.securityevent.dto.SecurityEventView;
 import com.easyoa.securityevent.repository.SecurityEventRepository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -34,6 +40,7 @@ public class SecurityEventService {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityEventService.class);
     private static final String GENESIS = "GENESIS";
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final SecurityEventRepository securityEventRepository;
     private final ObjectMapper objectMapper;
@@ -75,6 +82,16 @@ public class SecurityEventService {
                 now);
         securityEventRepository.save(event);
         log.info("securityEvent type={} severity={} actor={}", type, severity, event.getActorUsername());
+    }
+
+    /** 安全事件检索（ROOT / ADMIN 只读视图）。 */
+    @Transactional(readOnly = true)
+    public PageResponse<SecurityEventView> query(SecurityEventQuery query) {
+        int page = Math.max(query.page(), 1);
+        int size = Math.min(Math.max(query.size(), 1), MAX_PAGE_SIZE);
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<SecurityEvent> result = securityEventRepository.search(query, pageable);
+        return PageResponse.from(result, SecurityEventView::from);
     }
 
     private String toJson(Object detail) {

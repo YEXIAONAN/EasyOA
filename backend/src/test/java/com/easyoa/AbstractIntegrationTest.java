@@ -122,6 +122,8 @@ public abstract class AbstractIntegrationTest {
         userSessionRepository.deleteAll();
         loginAttemptRepository.deleteAll();
         userRepository.deleteAll();
+        // 安全策略恢复默认（删除后由 EasyOaProperties 默认值兜底），避免用例之间互相污染
+        jdbcTemplate.execute("delete from system_settings where key like 'security.%'");
         systemSettingService.setValue(SystemSettingService.KEY_SETUP_COMPLETED, "false", null);
     }
 

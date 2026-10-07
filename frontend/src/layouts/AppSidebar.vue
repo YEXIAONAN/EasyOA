@@ -6,6 +6,7 @@ import {
   Document,
   Folder,
   HomeFilled,
+  Lock,
   OfficeBuilding,
   Setting,
   Stamp,
@@ -61,6 +62,7 @@ const groups: NavGroup[] = [
   {
     label: '系统',
     items: [
+      { name: 'security', label: '安全中心', icon: Lock },
       { name: 'audit-logs', label: '审计日志', icon: Document, adminOnly: true },
       { name: 'settings', label: '系统设置', icon: Setting, adminOnly: true },
     ],
@@ -191,6 +193,9 @@ const visibleGroups = computed(() =>
 
 .sidebar__nav {
   flex: 1;
+  /* 必须显式 min-height: 0：否则 flex 项默认 min-height:auto，
+     内容超高时不会收缩，会把导航区撑到页脚下方导致末项被遮挡 */
+  min-height: 0;
   overflow-y: auto;
   padding: var(--easy-space-4) var(--easy-space-3);
   display: flex;

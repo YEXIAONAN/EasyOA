@@ -41,7 +41,20 @@ public enum ErrorCode {
     USERNAME_TAKEN(HttpStatus.CONFLICT, "用户名已被占用"),
 
     // --- 任务（Phase 4）：依赖阻塞需要前端触发「忽略依赖并开始」流程 ---
-    TASK_BLOCKED_BY_DEPENDENCIES(HttpStatus.CONFLICT, "当前任务仍有未完成的前置依赖");
+    TASK_BLOCKED_BY_DEPENDENCIES(HttpStatus.CONFLICT, "当前任务仍有未完成的前置依赖"),
+
+    // --- 安全（Phase 8）：TOTP / 高危操作 ---
+    // 动态口令类错误使用 422 而非 401：登录页需要停留在表单内提示，
+    // 不能被前端全局 401 处理器当成「会话失效」而清空页面状态。
+    TOTP_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "该账号已启用动态口令，请输入 6 位验证码"),
+    TOTP_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "动态验证码不正确或已过期"),
+    TOTP_ALREADY_ENABLED(HttpStatus.CONFLICT, "动态口令已绑定，请勿重复操作"),
+    TOTP_NOT_ENABLED(HttpStatus.CONFLICT, "当前账号尚未绑定动态口令"),
+    MFA_SETUP_REQUIRED(HttpStatus.FORBIDDEN, "管理员账号必须先绑定动态口令才能登录"),
+    MFA_REQUIRED(HttpStatus.FORBIDDEN, "执行高危操作前请先绑定动态口令"),
+    SENSITIVE_OPERATION_DENIED(HttpStatus.FORBIDDEN, "该高危操作仅限 ROOT 执行"),
+    CONFIRMATION_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "最终确认口令不正确"),
+    REASON_REQUIRED(HttpStatus.UNPROCESSABLE_ENTITY, "请填写操作原因（不少于 8 个字符）");
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

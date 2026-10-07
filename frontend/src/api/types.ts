@@ -46,6 +46,8 @@ export interface SetupInitializeResult {
 export interface LoginPayload {
   username: string
   password: string
+  /** 账号已绑定动态口令时必填（首次请求可省略，后端返回 TOTP_REQUIRED 后补填） */
+  totpCode?: string
 }
 
 export interface ChangePasswordPayload {
@@ -668,4 +670,91 @@ export interface ActivityItem {
   target: string
   link: string
   time: string
+}
+
+// ---------------------------------------------------------------------------
+// 安全（Phase 8）
+// ---------------------------------------------------------------------------
+
+/** 动态口令状态（接口永不返回已绑定的 Secret，只在绑定阶段返回一次） */
+export interface MfaStatus {
+  enabled: boolean
+  pendingEnrollment: boolean
+  requiredForAdmins: boolean
+  required: boolean
+}
+
+/** 绑定向导返回值：Secret 与 otpauth URI 只出现一次 */
+export interface MfaEnrollment {
+  issuer: string
+  account: string
+  secret: string
+  otpauthUri: string
+}
+
+export type SensitiveOperationType =
+  | 'AUDIT_LOG_PURGE'
+  | 'SENSITIVE_DATA_EXPORT'
+  | 'MFA_RESET'
+  | 'SECURITY_POLICY_CHANGE'
+  | 'DATA_DESTRUCTION'
+
+/** 高危操作影响范围预览（执行前展示给 ROOT，供其评估后果） */
+export interface SensitiveOperationPreview {
+  type: SensitiveOperationType
+  title: string
+  description: string
+  impacts: string[]
+  /** 最终确认需逐字输入的短语 */
+  confirmationPhrase: string
+  requiresTarget: boolean
+  targetLabel?: string | null
+}
+
+export interface SensitiveOperationResult {
+  type: SensitiveOperationType
+  title: string
+  message: string
+  result: Record<string, unknown>
+  executedAt: string
+}
+
+export type SecurityPolicy = {
+  loginMaxFailures: number
+  loginLockMinutes: number
+  passwordMinLength: number
+  totpRequiredForAdmins: boolean
+}
+
+/** 审计日志条目（Append Only；前端只读） */
+export interface AuditLogItem {
+  id: number
+  actorUserId?: number | null
+  actorUsername: string
+  action: string
+  resourceType?: string | null
+  resourceId?: string | null
+  beforeData?: string | null
+  afterData?: string | null
+  reason?: string | null
+  ipAddress?: string | null
+  requestId?: string | null
+  riskLevel: string
+  createdAt: string
+}
+
+/** 安全事件条目（永久追加；携带哈希链字段） */
+export interface SecurityEventItem {
+  id: number
+  eventType: string
+  severity: string
+  description: string
+  detail?: string | null
+  actorUserId?: number | null
+  actorUsername?: string | null
+  ipAddress?: string | null
+  requestId?: string | null
+  previousHash?: string | null
+  entryHash?: string | null
+  createdAt: string
 }

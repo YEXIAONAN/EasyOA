@@ -80,6 +80,10 @@ async function onUserCommand(command: string | number | object): Promise<void> {
     openPasswordDialog()
     return
   }
+  if (command === 'security') {
+    void router.push({ name: 'security' })
+    return
+  }
   if (command === 'logout') {
     await auth.logout()
     notification.success('已退出登录')
@@ -114,7 +118,8 @@ async function onUserCommand(command: string | number | object): Promise<void> {
             <el-dropdown-item disabled>
               {{ auth.user?.username }} · {{ systemRoleLabel(auth.user?.systemRole) }}
             </el-dropdown-item>
-            <el-dropdown-item divided command="password">修改密码</el-dropdown-item>
+            <el-dropdown-item divided command="security">安全中心</el-dropdown-item>
+            <el-dropdown-item command="password">修改密码</el-dropdown-item>
             <el-dropdown-item command="logout">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>

@@ -17,9 +17,11 @@ const route = useRoute()
 const auth = useAuthStore()
 const notification = useNotificationStore()
 
-const form = reactive({ username: '', password: '' })
+const form = reactive({ username: '', password: '', totpCode: '' })
 const submitting = ref(false)
 const formError = ref<string | null>(null)
+/** 后端返回 TOTP_REQUIRED 后展示动态验证码输入（账号已绑定动态口令） */
+const totpRequired = ref(false)
 
 const isDev = import.meta.env.DEV
 
@@ -46,11 +48,27 @@ async function submit(): Promise<void> {
   }
   submitting.value = true
   try {
-    await auth.login({ username: form.username.trim(), password: form.password })
+    await auth.login({
+      username: form.username.trim(),
+      password: form.password,
+      totpCode: totpRequired.value ? form.totpCode.trim() : undefined,
+    })
     notification.success(`欢迎回来，${auth.displayName}`)
     const redirect = safeRedirect()
     await router.replace(redirect ?? { name: 'workspace' })
   } catch (error) {
+    if (error instanceof ApiError && error.code === 'TOTP_REQUIRED') {
+      // 第一步（密码）已通过：引导用户补填动态验证码，不清空表单
+      totpRequired.value = true
+      formError.value = '该账号已启用动态口令，请输入 6 位验证码'
+      return
+    }
+    if (error instanceof ApiError && error.code === 'TOTP_INVALID') {
+      totpRequired.value = true
+      form.totpCode = ''
+      formError.value = error.message
+      return
+    }
     formError.value = error instanceof ApiError ? error.message : '登录失败，请稍后再试'
   } finally {
     submitting.value = false
@@ -116,6 +134,17 @@ async function submit(): Promise<void> {
             show-password
             placeholder="请输入密码"
             autocomplete="current-password"
+            :disabled="submitting"
+          />
+
+          <EasyInput
+            v-if="totpRequired"
+            v-model="form.totpCode"
+            label="动态验证码"
+            placeholder="Authenticator 应用中的 6 位数字"
+            inputmode="numeric"
+            maxlength="6"
+            autocomplete="one-time-code"
             :disabled="submitting"
           />
 

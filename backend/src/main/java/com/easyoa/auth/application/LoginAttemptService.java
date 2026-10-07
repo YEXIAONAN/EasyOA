@@ -8,25 +8,29 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.easyoa.auth.domain.LoginAttempt;
 import com.easyoa.auth.repository.LoginAttemptRepository;
-import com.easyoa.common.config.EasyOaProperties;
 import com.easyoa.common.exception.ApiException;
 import com.easyoa.common.exception.ErrorCode;
+import com.easyoa.security.application.SecuritySettingsService;
 
 /**
  * 登录失败限制（按用户名 + IP 双维度）。
  *
  * <p>策略：窗口期内（锁定时长）连续失败达到阈值后拒绝登录，
  * 任何一次成功登录都会清除该用户的失败计数（成功记录参与统计窗口）。
+ *
+ * <p>阈值与锁定时长来自 {@link SecuritySettingsService}（可由 ROOT 通过高危操作通道实时调整），
+ * 保证「安全设置」不是只读摆设。
  */
 @Service
 public class LoginAttemptService {
 
     private final LoginAttemptRepository loginAttemptRepository;
-    private final EasyOaProperties properties;
+    private final SecuritySettingsService securitySettingsService;
 
-    public LoginAttemptService(LoginAttemptRepository loginAttemptRepository, EasyOaProperties properties) {
+    public LoginAttemptService(LoginAttemptRepository loginAttemptRepository,
+            SecuritySettingsService securitySettingsService) {
         this.loginAttemptRepository = loginAttemptRepository;
-        this.properties = properties;
+        this.securitySettingsService = securitySettingsService;
     }
 
     /** 失败次数达到阈值 → 抛出 LOGIN_BLOCKED。 */
@@ -35,7 +39,7 @@ public class LoginAttemptService {
         Instant windowStart = lockWindowStart();
         if (failuresForUsername(username, windowStart) >= maxFailures()) {
             throw new ApiException(ErrorCode.LOGIN_BLOCKED, "登录失败次数过多，账号已被临时锁定，请 "
-                    + properties.getSecurity().getLoginLockMinutes() + " 分钟后重试");
+                    + lockMinutes() + " 分钟后重试");
         }
         if (ipAddress != null && failuresForIp(ipAddress, windowStart) >= maxFailures() * 3L) {
             throw new ApiException(ErrorCode.LOGIN_BLOCKED, "当前网络环境登录失败次数过多，请稍后再试");
@@ -73,10 +77,14 @@ public class LoginAttemptService {
     }
 
     private Instant lockWindowStart() {
-        return Instant.now().minus(properties.getSecurity().getLoginLockMinutes(), ChronoUnit.MINUTES);
+        return Instant.now().minus(lockMinutes(), ChronoUnit.MINUTES);
     }
 
     private int maxFailures() {
-        return properties.getSecurity().getLoginMaxFailures();
+        return securitySettingsService.loginMaxFailures();
+    }
+
+    private int lockMinutes() {
+        return securitySettingsService.loginLockMinutes();
     }
 }

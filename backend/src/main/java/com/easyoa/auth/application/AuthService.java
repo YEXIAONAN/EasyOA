@@ -26,9 +26,12 @@ import com.easyoa.common.exception.ErrorCode;
 import com.easyoa.common.requestid.RequestContext;
 import com.easyoa.common.security.SecurityUser;
 import com.easyoa.common.util.IpUtils;
+import com.easyoa.security.application.MfaService;
+import com.easyoa.security.application.SecuritySettingsService;
 import com.easyoa.securityevent.application.SecurityEventService;
 import com.easyoa.securityevent.domain.SecurityEventType;
 import com.easyoa.user.application.UserService;
+import com.easyoa.user.domain.SystemRole;
 import com.easyoa.user.domain.User;
 import com.easyoa.user.dto.UserProfileResponse;
 
@@ -60,12 +63,15 @@ public class AuthService {
     private final UserService userService;
     private final SessionService sessionService;
     private final LoginAttemptService loginAttemptService;
+    private final MfaService mfaService;
+    private final SecuritySettingsService securitySettingsService;
     private final AuditService auditService;
     private final SecurityEventService securityEventService;
 
     public AuthService(AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository,
             PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy, UserService userService,
-            SessionService sessionService, LoginAttemptService loginAttemptService, AuditService auditService,
+            SessionService sessionService, LoginAttemptService loginAttemptService, MfaService mfaService,
+            SecuritySettingsService securitySettingsService, AuditService auditService,
             SecurityEventService securityEventService) {
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
@@ -74,6 +80,8 @@ public class AuthService {
         this.userService = userService;
         this.sessionService = sessionService;
         this.loginAttemptService = loginAttemptService;
+        this.mfaService = mfaService;
+        this.securitySettingsService = securitySettingsService;
         this.auditService = auditService;
         this.securityEventService = securityEventService;
     }
@@ -117,6 +125,7 @@ public class AuthService {
         }
 
         SecurityUser principal = (SecurityUser) authentication.getPrincipal();
+        assertTotpSatisfied(request, principal, username, ip);
         establishSession(authentication, httpRequest, httpResponse, principal);
         loginAttemptService.recordSuccess(principal.username(), ip);
         userService.recordLogin(principal.id(), Instant.now());
@@ -125,6 +134,42 @@ public class AuthService {
 
         UserProfileResponse profile = userService.getProfile(principal.id());
         return CurrentUserResponse.from(profile);
+    }
+
+    /**
+     * 第二步校验：动态口令与管理员强制绑定策略。
+     *
+     * <p>刻意放在「建立会话之前」：密码正确但动态口令未通过时，
+     * 不得创建任何登录态。
+     */
+    private void assertTotpSatisfied(LoginRequest request, SecurityUser principal, String username, String ip) {
+        if (principal.totpEnabled()) {
+            String code = request.totpCode();
+            if (code == null || code.isBlank()) {
+                throw new ApiException(ErrorCode.TOTP_REQUIRED);
+            }
+            if (!mfaService.verifyCode(principal.id(), code)) {
+                long failures = loginAttemptService.recordFailure(username, ip, "BAD_TOTP");
+                if (loginAttemptService.hasReachedThreshold(failures)) {
+                    securityEventService.record(SecurityEventType.LOGIN_BLOCKED, "WARNING",
+                            "账号连续动态口令校验失败达到阈值，已被临时锁定：" + username,
+                            java.util.Map.of("failures", failures, "ip", ip == null ? "unknown" : ip));
+                }
+                auditService.record(AuditEntry.action(AuditActions.AUTH_LOGIN_FAILED, RiskLevel.ELEVATED)
+                        .actor(null, username)
+                        .reason("动态验证码错误"));
+                throw new ApiException(ErrorCode.TOTP_INVALID);
+            }
+            return;
+        }
+        // 未绑定动态口令的管理员：策略开启时直接拒绝登录，强制先完成绑定
+        if (securitySettingsService.totpRequiredForAdmins() && isAdminRole(principal.systemRole())) {
+            throw new ApiException(ErrorCode.MFA_SETUP_REQUIRED);
+        }
+    }
+
+    private boolean isAdminRole(SystemRole role) {
+        return role == SystemRole.ROOT || role == SystemRole.ADMIN;
     }
 
     /** 登出：撤销会话记录、清理安全上下文并审计。 */

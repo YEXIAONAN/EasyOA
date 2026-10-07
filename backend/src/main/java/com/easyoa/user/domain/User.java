@@ -140,6 +140,32 @@ public class User {
         return status == UserStatus.ACTIVE;
     }
 
+    // --- 动态口令（TOTP） ---
+
+    /**
+     * 写入待确认的加密 Secret：此时 {@code totpEnabled} 仍为 false，
+     * 用户需用验证码确认后才能正式启用（防止绑定过程中丢失设备导致自锁）。
+     */
+    public void stageTotpSecret(String encryptedSecret) {
+        this.totpSecretEncrypted = encryptedSecret;
+        this.totpEnabled = false;
+    }
+
+    /** 确认绑定：待确认 Secret 转为正式启用。 */
+    public void enableTotp() {
+        this.totpEnabled = true;
+    }
+
+    /** 解除绑定 / 重置：同时清除加密 Secret，避免残留可用密钥。 */
+    public void clearTotp() {
+        this.totpEnabled = false;
+        this.totpSecretEncrypted = null;
+    }
+
+    public String getTotpSecretEncrypted() {
+        return totpSecretEncrypted;
+    }
+
     // --- getters ---
 
     public Long getId() {

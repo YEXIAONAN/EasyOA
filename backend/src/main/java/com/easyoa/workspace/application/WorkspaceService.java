@@ -23,18 +23,21 @@ public class WorkspaceService {
 
     private static final int RECENT_PROJECT_LIMIT = 4;
     private static final int MY_TASK_LIMIT = 5;
+    private static final int ACTIVITY_LIMIT = 6;
 
     private final UserService userService;
     private final ProjectService projectService;
     private final TaskService taskService;
     private final ApprovalService approvalService;
+    private final ActivityService activityService;
 
     public WorkspaceService(UserService userService, ProjectService projectService, TaskService taskService,
-            ApprovalService approvalService) {
+            ApprovalService approvalService, ActivityService activityService) {
         this.userService = userService;
         this.projectService = projectService;
         this.taskService = taskService;
         this.approvalService = approvalService;
+        this.activityService = activityService;
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +55,7 @@ public class WorkspaceService {
                 kpis,
                 taskService.recentMyTasks(userId, MY_TASK_LIMIT),
                 approvalService.recentPendingForApprover(userId),
+                activityService.recent(userId, ACTIVITY_LIMIT),
                 projectService.recentProjectsFor(userId, RECENT_PROJECT_LIMIT));
     }
 }

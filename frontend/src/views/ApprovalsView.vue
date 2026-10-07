@@ -71,6 +71,11 @@ async function load(): Promise<void> {
 onMounted(() => {
   readScopeFromQuery()
   void load()
+  // 命令面板「发起审批」直达
+  if (route.query.create === '1') {
+    createOpen.value = true
+    void router.replace({ query: { ...route.query, create: undefined } })
+  }
 })
 
 watch(

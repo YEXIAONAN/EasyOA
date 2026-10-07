@@ -3,15 +3,25 @@ import { ElMessage } from 'element-plus'
 import { defineStore } from 'pinia'
 
 import { ApiError } from '@/api/errors'
+import { notificationApi } from '@/api/modules/notifications'
 
 /**
  * 通知中心状态。
  *
- * v0.1.0 Phase 1：完成 UI 反馈（Toast）与错误归一化。
- * 真实通知（任务/审批/评论）在 Phase 7 Workspace 阶段接入后端，届时 unreadCount 变为真实值。
+ * Phase 7 起：unreadCount 为真实未读数（顶部铃铛轮询刷新）；Toast 反馈保持不变。
  */
 export const useNotificationStore = defineStore('notification', () => {
   const unreadCount = ref(0)
+
+  /** 拉取未读数（任务分配 / 审批待办 / @ 提及等真实通知）。 */
+  async function refreshUnread(): Promise<void> {
+    try {
+      const result = await notificationApi.unreadCount()
+      unreadCount.value = result.count
+    } catch {
+      // 未登录或网络异常时保持原值，不打扰用户
+    }
+  }
 
   function success(message: string): void {
     ElMessage({ type: 'success', message, duration: 2400 })
@@ -39,5 +49,5 @@ export const useNotificationStore = defineStore('notification', () => {
     return '操作失败，请稍后再试'
   }
 
-  return { unreadCount, success, info, warning, error }
+  return { unreadCount, refreshUnread, success, info, warning, error }
 })

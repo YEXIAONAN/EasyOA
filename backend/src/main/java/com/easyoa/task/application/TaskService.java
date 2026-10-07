@@ -27,6 +27,8 @@ import com.easyoa.common.exception.ApiException;
 import com.easyoa.common.exception.ErrorCode;
 import com.easyoa.common.response.PageResponse;
 import com.easyoa.common.security.SecurityUser;
+import com.easyoa.notification.application.NotificationService;
+import com.easyoa.notification.domain.NotificationType;
 import com.easyoa.project.application.ProjectPermissionService;
 import com.easyoa.project.domain.Project;
 import com.easyoa.project.domain.ProjectRole;
@@ -90,11 +92,13 @@ public class TaskService {
     private final ProjectMemberRepository projectMemberRepository;
     private final UserService userService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public TaskService(TaskRepository taskRepository, TaskCollaboratorRepository taskCollaboratorRepository,
             TaskDependencyRepository taskDependencyRepository, TaskStatusService taskStatusService,
             TaskPermissionService permissionService, ProjectPermissionService projectPermissionService,
-            ProjectMemberRepository projectMemberRepository, UserService userService, AuditService auditService) {
+            ProjectMemberRepository projectMemberRepository, UserService userService, AuditService auditService,
+            NotificationService notificationService) {
         this.taskRepository = taskRepository;
         this.taskCollaboratorRepository = taskCollaboratorRepository;
         this.taskDependencyRepository = taskDependencyRepository;
@@ -104,6 +108,7 @@ public class TaskService {
         this.projectMemberRepository = projectMemberRepository;
         this.userService = userService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     // --- 看板与列表 -------------------------------------------------------------
@@ -260,6 +265,10 @@ public class TaskService {
                         "status", status.getName(),
                         "assignmentState", task.getAssignmentState().name()))
                 .reason(pending ? "创建任务（待派发审核）" : "创建任务"));
+        if (!pending) {
+            notifyAssignees(task, NotificationType.TASK_ASSIGNED, "任务已分配",
+                    "你被指派为「" + task.getTitle() + "」的负责人", actor.id());
+        }
         return buildDetail(task);
     }
 
@@ -300,6 +309,10 @@ public class TaskService {
                         "primaryAssigneeId", primary.getId(),
                         "assignmentState", subtask.getAssignmentState().name()))
                 .reason("创建子任务"));
+        if (!pending) {
+            notifyAssignees(subtask, NotificationType.TASK_ASSIGNED, "任务已分配",
+                    "你被指派为子任务「" + subtask.getTitle() + "」的负责人", actor.id());
+        }
         return buildDetail(parent);
     }
 
@@ -330,10 +343,12 @@ public class TaskService {
      */
     @Transactional
     public TaskDetailResponse changeStatus(Long taskId, ChangeTaskStatusRequest request) {
+        SecurityUser actor = permissionService.requireAuthenticated();
         Task task = permissionService.requireManage(taskId);
         TaskStatus target = taskStatusService.requireStatus(task.getProject().getId(), request.statusId());
         TaskStatusType currentType = task.getStatus().getSystemType();
         TaskStatusType targetType = target.getSystemType();
+        String fromStatusName = task.getStatus().getName();
 
         if (task.getStatus().getId().equals(target.getId())) {
             throw ApiException.conflict("任务已处于「" + target.getName() + "」状态");
@@ -377,6 +392,8 @@ public class TaskService {
                     .after(Map.of("completedAt", String.valueOf(task.getCompletedAt())))
                     .reason("任务完成"));
         }
+        notifyAssignees(task, NotificationType.TASK_STATUS_CHANGED, "任务状态变更",
+                "「" + task.getTitle() + "」：" + fromStatusName + " → " + target.getName(), actor.id());
         recomputeParentIfAuto(task);
         return buildDetail(task);
     }
@@ -408,6 +425,7 @@ public class TaskService {
     /** 调整负责人（主负责人 / 副负责人；副负责人不能修改主负责人，由 full control 保证）。 */
     @Transactional
     public TaskDetailResponse changeAssignees(Long taskId, UpdateTaskAssigneesRequest request) {
+        SecurityUser actor = permissionService.requireAuthenticated();
         Task task = permissionService.requireFullControl(taskId);
         Long projectId = task.getProject().getId();
         User primary = resolveAssignee(projectId, request.primaryAssigneeId());
@@ -427,6 +445,8 @@ public class TaskService {
                 .after(Map.of("primaryAssigneeId", primary.getId(),
                         "deputyAssigneeId", deputy == null ? "" : deputy.getId()))
                 .reason("调整任务负责人"));
+        notifyAssignees(task, NotificationType.TASK_ASSIGNED, "任务已分配",
+                "你被指派为「" + task.getTitle() + "」的负责人", actor.id());
         return buildDetail(task);
     }
 
@@ -481,6 +501,7 @@ public class TaskService {
     /** 派发审核通过：任务正式生效（进入看板与列表）。 */
     @Transactional
     public TaskDetailResponse approveAssignment(Long taskId) {
+        SecurityUser actor = permissionService.requireAuthenticated();
         Task task = permissionService.requireViewable(taskId);
         permissionService.requireProjectManagement(task.getProject().getId());
         if (!task.isPendingAssignment()) {
@@ -494,6 +515,8 @@ public class TaskService {
                 .after(Map.of("assignmentState", AssignmentState.ACTIVE.name(),
                         "primaryAssigneeId", task.getPrimaryAssignee().getId()))
                 .reason("派发审核通过"));
+        notifyAssignees(task, NotificationType.TASK_ASSIGNED, "任务派发已通过",
+                "「" + task.getTitle() + "」已正式生效", actor.id());
         return buildDetail(task);
     }
 
@@ -585,6 +608,20 @@ public class TaskService {
 
     private String parentTitle(Task task) {
         return task.getParent() == null ? null : task.getParent().getTitle();
+    }
+
+    /** 任务通知（收件人：主负责人 + 副负责人；触发者本人自动跳过）。 */
+    private void notifyAssignees(Task task, NotificationType type, String title, String body, Long actorId) {
+        List<Long> recipients = new ArrayList<>();
+        recipients.add(task.getPrimaryAssignee().getId());
+        if (task.getDeputyAssignee() != null) {
+            recipients.add(task.getDeputyAssignee().getId());
+        }
+        notificationService.notifyAll(recipients, type, title, body, taskLink(task), "TASK", task.getId(), actorId);
+    }
+
+    private String taskLink(Task task) {
+        return "/projects/" + task.getProject().getId() + "/board?task=" + task.getId();
     }
 
     /**

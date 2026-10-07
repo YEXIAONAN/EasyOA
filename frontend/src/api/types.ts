@@ -72,6 +72,8 @@ export interface WorkspaceSummary {
   myTasks: TaskCard[]
   /** 「待我审批」区块（Phase 6 起为真实数据；必须进入详情处理，不支持一键批准） */
   pendingApprovals: ApprovalCard[]
+  /** 「项目动态」区块（Phase 7 起为真实 Activity Feed） */
+  activity: ActivityItem[]
   /** 当前用户参与的项目（工作台「项目进度」区块，Phase 3 起为真实数据） */
   projectProgress: ProjectCard[]
 }
@@ -620,4 +622,50 @@ export interface TemplatePayload {
   description?: string
   formFields: FormFieldDef[]
   nodes: NodeDefinition[]
+}
+
+// ---------------------------------------------------------------------------
+// 工作台：通知 / 搜索 / Activity Feed（Phase 7）
+// ---------------------------------------------------------------------------
+
+/** 业务通知（含 Deep Link：点击直达任务 / 审批 / 项目） */
+export interface NotificationItem {
+  id: number
+  type: string
+  title: string
+  body?: string | null
+  link: string
+  resourceType?: string | null
+  resourceId?: number | null
+  actorName?: string | null
+  read: boolean
+  createdAt: string
+}
+
+export interface SearchHit {
+  id: number
+  title: string
+  subtitle?: string | null
+  link: string
+}
+
+/** 全局搜索结果（按类别分组，每组最多 5 条） */
+export interface SearchResponse {
+  query: string
+  projects: SearchHit[]
+  tasks: SearchHit[]
+  users: SearchHit[]
+  approvals: SearchHit[]
+}
+
+/** Activity Feed 条目（业务动态，不是审计日志） */
+export interface ActivityItem {
+  type: string
+  actorId?: number | null
+  actorName?: string | null
+  avatarUrl?: string | null
+  action: string
+  target: string
+  link: string
+  time: string
 }

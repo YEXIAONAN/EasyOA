@@ -1,6 +1,7 @@
 package com.easyoa.approval.repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -99,4 +100,19 @@ public interface ApprovalInstanceRepository extends JpaRepository<ApprovalInstan
             """)
     long countPendingForApprover(@Param("userId") Long userId, @Param("status") ApprovalStatus status,
             @Param("approverStatus") ApproverStatus approverStatus);
+
+    /** 全局搜索（数据范围：申请人 / 参与审批者 / 管理员）。 */
+    @Query("""
+            select i from ApprovalInstance i
+            join fetch i.applicant
+            join fetch i.template
+            where (:scopeAll = true
+                   or i.applicant.id = :userId
+                   or exists (select a.id from ApprovalNodeApprover a
+                              where a.node.instance = i and a.user.id = :userId))
+              and lower(i.title) like :keyword
+            order by i.updatedAt desc, i.id desc
+            """)
+    List<ApprovalInstance> searchForUser(@Param("scopeAll") boolean scopeAll, @Param("userId") Long userId,
+            @Param("keyword") String keyword, Pageable pageable);
 }

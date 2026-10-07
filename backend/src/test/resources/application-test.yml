@@ -14,6 +14,10 @@ easyoa:
     # 附件写入临时目录；大小限制调小便于测试「超限拒绝」
     path: ${java.io.tmpdir}/easyoa-test-storage
     max-file-size: 1048576
+  notifications:
+    scheduler:
+      # 集成测试关闭定时扫描（通知在用例中通过业务动作触发）
+      enabled: false
 
 logging:
   level:

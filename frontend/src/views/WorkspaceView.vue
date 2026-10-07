@@ -6,7 +6,7 @@ import type { Component } from 'vue'
 
 import { authApi } from '@/api/modules/auth'
 import { workspaceApi } from '@/api/modules/workspace'
-import type { TaskCard } from '@/api/types'
+import type { ActivityItem, TaskCard } from '@/api/types'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyEmpty from '@/components/easy/EasyEmpty.vue'
 import EasyStatus from '@/components/easy/EasyStatus.vue'
@@ -100,6 +100,11 @@ function openTask(task: TaskCard): void {
     params: { id: String(task.projectId) },
     query: { task: String(task.id) },
   })
+}
+
+/** Activity Feed 深链：直达任务 / 审批 / 项目，不跳回首页 */
+function openActivity(item: ActivityItem): void {
+  void router.push(item.link)
 }
 </script>
 
@@ -243,12 +248,30 @@ function openTask(task: TaskCard): void {
       <div class="easy-card">
         <div class="easy-card__header">
           <span class="easy-card__title">项目动态</span>
+          <span class="easy-text-xs easy-muted">业务动态（Activity Feed），不是审计日志</span>
+        </div>
+        <div v-if="(summary.data.value?.activity.length ?? 0) > 0" class="activity-list">
+          <button
+            v-for="(item, index) in summary.data.value?.activity ?? []"
+            :key="`${item.type}-${index}`"
+            type="button"
+            class="activity-item"
+            @click="openActivity(item)"
+          >
+            <span class="activity-item__dot" aria-hidden="true" />
+            <span class="activity-item__text">
+              <strong>{{ item.actorName ?? '系统' }}</strong>
+              {{ item.action }}
+              <span class="activity-item__target">{{ item.target }}</span>
+            </span>
+            <span class="activity-item__time">{{ formatRelative(item.time) }}</span>
+          </button>
         </div>
         <EasyEmpty
+          v-else
           compact
           title="暂无动态"
-          phase="Phase 7"
-          description="Activity Feed 将在 Phase 7 交付，用于展示成员完成任务、评论与状态变化。"
+          description="完成任务、评论任务、发起审批等业务动态会在这里汇总（仅显示你参与的内容）。"
         />
       </div>
 
@@ -686,5 +709,62 @@ function openTask(task: TaskCard): void {
   font-size: var(--easy-text-xs);
   color: var(--easy-text-3);
   flex-wrap: wrap;
+}
+
+/* --- 项目动态区块（Phase 7 起为真实 Activity Feed） ---------------------------- */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  padding: var(--easy-space-2);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+  padding: var(--easy-space-2) var(--easy-space-3);
+  border: none;
+  border-radius: var(--easy-radius-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--easy-transition-fast);
+}
+
+.activity-item:hover {
+  background: var(--easy-surface-hover);
+}
+
+.activity-item__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--easy-brand);
+}
+
+.activity-item__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--easy-text-sm);
+  color: var(--easy-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-item__text strong {
+  color: var(--easy-text-1);
+  font-weight: 600;
+}
+
+.activity-item__target {
+  color: var(--easy-brand-text);
+}
+
+.activity-item__time {
+  flex: none;
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
 }
 </style>

@@ -34,6 +34,8 @@ import com.easyoa.common.security.SecurityUser;
 import com.easyoa.file.application.FileService;
 import com.easyoa.file.domain.FileObject;
 import com.easyoa.file.dto.FileView;
+import com.easyoa.notification.application.NotificationService;
+import com.easyoa.notification.domain.NotificationType;
 import com.easyoa.project.repository.ProjectMemberRepository;
 import com.easyoa.task.application.TaskPermissionService;
 import com.easyoa.task.domain.Task;
@@ -64,11 +66,13 @@ public class CommentService {
     private final UserService userService;
     private final TaskPermissionService taskPermissionService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public CommentService(CommentRepository commentRepository, CommentVersionRepository commentVersionRepository,
             CommentMentionRepository commentMentionRepository, CommentPermissionService permissionService,
             FileService fileService, ProjectMemberRepository projectMemberRepository, UserService userService,
-            TaskPermissionService taskPermissionService, AuditService auditService) {
+            TaskPermissionService taskPermissionService, AuditService auditService,
+            NotificationService notificationService) {
         this.commentRepository = commentRepository;
         this.commentVersionRepository = commentVersionRepository;
         this.commentMentionRepository = commentMentionRepository;
@@ -78,6 +82,7 @@ public class CommentService {
         this.userService = userService;
         this.taskPermissionService = taskPermissionService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     // --- 查询 -------------------------------------------------------------------
@@ -123,6 +128,7 @@ public class CommentService {
 
         List<CommentMention> mentions = syncMentions(task, comment, request.mentionUserIds());
         List<FileObject> attachments = fileService.linkToComment(task, comment, request.attachmentFileIds(), actor);
+        notifyCommentCreated(comment, parent, mentions, actor.id());
         return toView(comment, mentions, attachments.stream().map(FileView::from).toList(), List.of());
     }
 
@@ -143,10 +149,19 @@ public class CommentService {
                 userService.getById(actor.id())));
 
         List<CommentMention> mentions;
+        Set<Long> beforeMentionIds = new HashSet<>();
         if (request.mentionUserIds() != null) {
+            commentMentionRepository.findByCommentIds(List.of(commentId))
+                    .forEach(mention -> beforeMentionIds.add(mention.getUser().getId()));
             mentions = syncMentions(comment.getTask(), comment, request.mentionUserIds());
         } else {
             mentions = commentMentionRepository.findByCommentIds(List.of(commentId));
+        }
+        // 编辑新增的 @ 成员同样触发通知
+        for (CommentMention mention : mentions) {
+            if (!beforeMentionIds.contains(mention.getUser().getId())) {
+                notifyMention(comment, mention.getUser(), actor.id());
+            }
         }
 
         auditService.record(AuditEntry.action(AuditActions.COMMENT_EDITED, RiskLevel.NORMAL)
@@ -181,6 +196,41 @@ public class CommentService {
     }
 
     // --- 内部方法 ---------------------------------------------------------------
+
+    /** 评论创建通知：@成员（MENTION）+ 回复通知（COMMENT_REPLY，@ 已覆盖则不重复发）。 */
+    private void notifyCommentCreated(Comment comment, Comment parent, List<CommentMention> mentions, Long actorId) {
+        Set<Long> mentionedIds = new HashSet<>();
+        for (CommentMention mention : mentions) {
+            mentionedIds.add(mention.getUser().getId());
+            notifyMention(comment, mention.getUser(), actorId);
+        }
+        if (parent != null && !mentionedIds.contains(parent.getAuthor().getId())) {
+            notificationService.notify(parent.getAuthor().getId(), NotificationType.COMMENT_REPLY,
+                    "有人在任务评论中回复了你",
+                    comment.getAuthor().getDisplayName() + "：" + excerpt(comment.getContent()),
+                    commentLink(comment), "COMMENT", comment.getId(), actorId);
+        }
+    }
+
+    private void notifyMention(Comment comment, User mentioned, Long actorId) {
+        notificationService.notify(mentioned.getId(), NotificationType.MENTION,
+                "有人在任务评论中提到了你",
+                comment.getAuthor().getDisplayName() + "：" + excerpt(comment.getContent()),
+                commentLink(comment), "COMMENT", comment.getId(), actorId);
+    }
+
+    private String commentLink(Comment comment) {
+        Long taskId = comment.getTask().getId();
+        Long projectId = comment.getTask().getProject().getId();
+        return "/projects/" + projectId + "/board?task=" + taskId;
+    }
+
+    private String excerpt(String content) {
+        if (content == null) {
+            return "";
+        }
+        return content.length() > 60 ? content.substring(0, 60) + "…" : content;
+    }
 
     private Comment resolveParent(Long taskId, Long parentId) {
         if (parentId == null) {

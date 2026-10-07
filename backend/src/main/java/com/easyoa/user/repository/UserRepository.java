@@ -62,4 +62,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> searchDirectory(@Param("keyword") String keyword, @Param("status") UserStatus status,
             @Param("filterByOrg") boolean filterByOrg, @Param("userIds") Collection<Long> userIds,
             Pageable pageable);
+
+    /** 全局搜索：按用户名 / 姓名 / 职位检索有效成员。 */
+    @Query("""
+            select u from User u
+            where u.status = :status
+              and (lower(u.username) like :keyword
+                   or lower(u.displayName) like :keyword
+                   or lower(coalesce(u.jobTitle, '')) like :keyword)
+            order by u.displayName asc, u.id asc
+            """)
+    java.util.List<User> searchByKeyword(@Param("keyword") String keyword, @Param("status") UserStatus status,
+            Pageable pageable);
 }

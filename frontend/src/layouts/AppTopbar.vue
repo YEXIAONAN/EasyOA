@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowDown, Bell, Search } from '@element-plus/icons-vue'
+import { ArrowDown, Search } from '@element-plus/icons-vue'
 
 import { authApi } from '@/api/modules/auth'
 import { ApiError } from '@/api/errors'
@@ -9,6 +9,7 @@ import EasyAvatar from '@/components/easy/EasyAvatar.vue'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyDialog from '@/components/easy/EasyDialog.vue'
 import EasyInput from '@/components/easy/EasyInput.vue'
+import NotificationBell from '@/components/workbench/NotificationBell.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useUiStore } from '@/stores/ui'
@@ -100,21 +101,7 @@ async function onUserCommand(command: string | number | object): Promise<void> {
         <span class="topbar__kbd">{{ isMac ? '⌘K' : 'Ctrl K' }}</span>
       </button>
 
-      <el-popover placement="bottom-end" :width="320" trigger="click" popper-class="easy-popover">
-        <template #reference>
-          <button type="button" class="topbar__icon-button" aria-label="通知中心">
-            <el-icon><Bell /></el-icon>
-            <span v-if="notification.unreadCount > 0" class="topbar__badge">{{ notification.unreadCount }}</span>
-          </button>
-        </template>
-        <div class="popover-title">通知</div>
-        <div class="popover-empty">
-          <p class="popover-empty__title">暂无通知</p>
-          <p class="popover-empty__hint">
-            任务分配、审批待办、评论 @ 等通知将在 Phase 7 接入，并支持点击直达对应内容。
-          </p>
-        </div>
-      </el-popover>
+      <NotificationBell />
 
       <el-dropdown trigger="click" @command="onUserCommand">
         <button type="button" class="topbar__user">
@@ -237,42 +224,6 @@ async function onUserCommand(command: string | number | object): Promise<void> {
   font-family: var(--easy-font-mono);
 }
 
-.topbar__icon-button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: var(--easy-radius-md);
-  background: transparent;
-  color: var(--easy-text-2);
-  font-size: 17px;
-  cursor: pointer;
-  transition: background var(--easy-transition-fast), color var(--easy-transition-fast);
-}
-
-.topbar__icon-button:hover {
-  background: var(--easy-surface-hover);
-  color: var(--easy-text-1);
-}
-
-.topbar__badge {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: var(--easy-radius-full);
-  background: var(--easy-danger);
-  color: #fff;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-}
-
 .topbar__user {
   display: flex;
   align-items: center;
@@ -302,30 +253,6 @@ async function onUserCommand(command: string | number | object): Promise<void> {
 .topbar__user-caret {
   font-size: 12px;
   color: var(--easy-text-3);
-}
-
-.popover-title {
-  font-size: var(--easy-text-sm);
-  font-weight: 600;
-  padding-bottom: var(--easy-space-2);
-  border-bottom: 1px solid var(--easy-border);
-}
-
-.popover-empty {
-  padding: var(--easy-space-4) 0 var(--easy-space-2);
-  text-align: center;
-}
-
-.popover-empty__title {
-  font-size: var(--easy-text-sm);
-  color: var(--easy-text-2);
-}
-
-.popover-empty__hint {
-  margin-top: var(--easy-space-2);
-  font-size: var(--easy-text-xs);
-  color: var(--easy-text-3);
-  line-height: var(--easy-leading-relaxed);
 }
 
 .password-form {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Plus, Search } from '@element-plus/icons-vue'
 
 import { ApiError } from '@/api/errors'
@@ -24,7 +24,11 @@ import { projectRoleLabel, projectRoleTone, projectStatusLabel, projectStatusTon
  * 数据范围由后端决定：普通成员只看到自己参与的项目，管理员可看到全部项目。
  */
 const router = useRouter()
+const route = useRoute()
 const notification = useNotificationStore()
+
+/** 「创建任务」快捷动作：进入项目列表后提示先选择项目（进入看板即可创建任务）。 */
+const pickTaskForCreate = computed(() => route.query.create === 'task')
 
 const keyword = ref('')
 const statusFilter = ref<ProjectStatus | null>(null)
@@ -63,7 +67,27 @@ async function loadProjects(): Promise<void> {
   }
 }
 
-onMounted(loadProjects)
+onMounted(() => {
+  void loadProjects()
+  // 命令面板「创建项目」直达：打开新建弹窗并清理 query
+  if (route.query.create === '1') {
+    createOpen.value = true
+    void router.replace({ query: { ...route.query, create: undefined } })
+  }
+})
+
+/** 项目卡片点击：创建任务模式下直接进入看板（?create=1 自动打开新建任务弹窗） */
+function openProject(project: ProjectCard): void {
+  if (pickTaskForCreate.value) {
+    void router.push({
+      name: 'project-board',
+      params: { id: String(project.id) },
+      query: { create: '1' },
+    })
+    return
+  }
+  void router.push({ name: 'project-detail', params: { id: project.id } })
+}
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(keyword, () => {
@@ -162,6 +186,13 @@ const activeCount = computed(
       </EasyButton>
     </header>
 
+    <div v-if="pickTaskForCreate" class="create-task-banner">
+      <span>已选择「创建任务」：点击任意项目卡片进入看板，将自动弹出「新建任务」弹窗。</span>
+      <EasyButton size="sm" @click="router.replace({ query: { ...route.query, create: undefined } })">
+        取消
+      </EasyButton>
+    </div>
+
     <div class="toolbar">
       <div class="toolbar__search">
         <el-icon class="toolbar__search-icon"><Search /></el-icon>
@@ -191,7 +222,7 @@ const activeCount = computed(
         :key="project.id"
         type="button"
         class="easy-card project-card"
-        @click="router.push({ name: 'project-detail', params: { id: project.id } })"
+        @click="openProject(project)"
       >
         <div class="project-card__head">
           <span class="project-card__name">{{ project.name }}</span>
@@ -304,6 +335,19 @@ const activeCount = computed(
   display: flex;
   align-items: center;
   gap: var(--easy-space-3);
+}
+
+.create-task-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--easy-space-3);
+  padding: var(--easy-space-3) var(--easy-space-4);
+  border: 1px solid var(--easy-brand);
+  border-radius: var(--easy-radius-md);
+  background: var(--easy-brand-subtle);
+  color: var(--easy-brand-text);
+  font-size: var(--easy-text-sm);
   flex-wrap: wrap;
 }
 

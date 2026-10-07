@@ -10,14 +10,15 @@ import com.easyoa.task.dto.TaskCardResponse;
 /**
  * 工作台摘要。
  *
- * <p>Phase 6 起「待我审批」KPI 与「待我审批」区块接入真实审批数据（不允许一键批准，
- * 必须进入详情页处理）。
+ * <p>Phase 7 起「项目动态」区块接入真实 Activity Feed（业务动态，含深链）；
+ * 全部 KPI 与区块均为真实数据。
  */
 public record WorkspaceSummaryResponse(
         UserBrief me,
         KpiSummary kpis,
         List<TaskCardResponse> myTasks,
         List<ApprovalCardView> pendingApprovals,
+        List<ActivityView> activity,
         List<ProjectCardResponse> projectProgress) {
 
     public record UserBrief(

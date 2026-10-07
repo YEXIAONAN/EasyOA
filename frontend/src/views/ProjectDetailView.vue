@@ -81,6 +81,11 @@ async function load(): Promise<void> {
     detail.value = await projectApi.detail(projectId.value)
     syncInfoForm()
     void loadTaskOverview()
+    // 命令面板「创建任务」直达：进入看板后自动打开新建任务弹窗
+    if (route.query.create === '1') {
+      createOpen.value = true
+      void router.replace({ query: { ...route.query, create: undefined } })
+    }
   } catch (error) {
     loadError.value = error instanceof ApiError ? error.message : '项目加载失败'
   } finally {

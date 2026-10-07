@@ -14,6 +14,8 @@ import com.easyoa.common.exception.ApiException;
 import com.easyoa.common.exception.ErrorCode;
 import com.easyoa.common.requestid.RequestContext;
 import com.easyoa.common.security.SecurityUser;
+import com.easyoa.notification.application.NotificationService;
+import com.easyoa.notification.domain.NotificationType;
 import com.easyoa.project.domain.Project;
 import com.easyoa.project.domain.ProjectMember;
 import com.easyoa.project.domain.ProjectRole;
@@ -44,14 +46,17 @@ public class ProjectMemberService {
     private final ProjectPermissionService permissionService;
     private final UserService userService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public ProjectMemberService(ProjectMemberRepository projectMemberRepository, ProjectService projectService,
-            ProjectPermissionService permissionService, UserService userService, AuditService auditService) {
+            ProjectPermissionService permissionService, UserService userService, AuditService auditService,
+            NotificationService notificationService) {
         this.projectMemberRepository = projectMemberRepository;
         this.projectService = projectService;
         this.permissionService = permissionService;
         this.userService = userService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +83,9 @@ public class ProjectMemberService {
                 .resource("PROJECT", projectId)
                 .after(Map.of("userId", userId, "role", ProjectRole.MEMBER.name()))
                 .reason("添加项目成员"));
+        SecurityUser actor = permissionService.requireAuthenticated();
+        notificationService.notify(userId, NotificationType.PROJECT_MEMBER_ADDED, "你已加入项目",
+                "项目：「" + project.getName() + "」", "/projects/" + projectId, "PROJECT", projectId, actor.id());
         return members(projectId);
     }
 
@@ -155,6 +163,9 @@ public class ProjectMemberService {
                 .resource("PROJECT", projectId)
                 .after(Map.of("deputyOwnerUserId", userId))
                 .reason("设置副负责人"));
+        notificationService.notify(userId, NotificationType.PROJECT_ROLE_CHANGED, "你的项目角色已变更",
+                "你已成为「" + project.getName() + "」的副负责人",
+                "/projects/" + projectId + "?tab=members", "PROJECT", projectId, actor.id());
         return projectService.toDetail(project, actor);
     }
 
@@ -192,6 +203,13 @@ public class ProjectMemberService {
                 .before(Map.of("ownerUserId", actor.id()))
                 .after(Map.of("ownerUserId", targetUserId))
                 .reason("转让项目负责人"));
+        notificationService.notify(targetUserId, NotificationType.PROJECT_ROLE_CHANGED, "你的项目角色已变更",
+                "你已成为「" + project.getName() + "」的项目负责人",
+                "/projects/" + projectId + "?tab=members", "PROJECT", projectId, actor.id());
+        notificationService.notify(actor.id(), NotificationType.PROJECT_ROLE_CHANGED, "你的项目角色已变更",
+                "你已不再是「" + project.getName() + "」的项目负责人（已转让给 "
+                        + targetUser.getDisplayName() + "）",
+                "/projects/" + projectId + "?tab=members", "PROJECT", projectId, targetUserId);
         return projectService.toDetail(project, actor);
     }
 

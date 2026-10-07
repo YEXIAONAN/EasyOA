@@ -42,6 +42,8 @@ import com.easyoa.common.exception.ErrorCode;
 import com.easyoa.common.response.PageResponse;
 import com.easyoa.common.security.SecurityUser;
 import com.easyoa.file.application.FileService;
+import com.easyoa.notification.application.NotificationService;
+import com.easyoa.notification.domain.NotificationType;
 import com.easyoa.task.dto.TaskUserBrief;
 import com.easyoa.user.application.UserService;
 import com.easyoa.user.domain.User;
@@ -76,13 +78,14 @@ public class ApprovalService {
     private final FileService fileService;
     private final UserService userService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     public ApprovalService(ApprovalInstanceRepository instanceRepository, ApprovalNodeRepository nodeRepository,
             ApprovalNodeApproverRepository approverRepository, ApprovalActionRepository actionRepository,
             ApprovalTemplateRepository templateRepository, ApprovalTemplateService templateService,
             ApprovalSchemaCodec schemaCodec, ApproverResolver approverResolver,
             ApprovalPermissionService permissionService, FileService fileService, UserService userService,
-            AuditService auditService) {
+            AuditService auditService, NotificationService notificationService) {
         this.instanceRepository = instanceRepository;
         this.nodeRepository = nodeRepository;
         this.approverRepository = approverRepository;
@@ -95,6 +98,7 @@ public class ApprovalService {
         this.fileService = fileService;
         this.userService = userService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     // --- 查询 -------------------------------------------------------------------
@@ -294,6 +298,7 @@ public class ApprovalService {
                 .after(Map.of("template", instance.getTemplate().getName(),
                         "version", instance.getTemplateVersionNo(), "nodes", nodeCount))
                 .reason("提交审批"));
+        notifyNodeApprovers(instanceId, 0, instance, actor.id());
         return detail(instanceId);
     }
 
@@ -302,6 +307,7 @@ public class ApprovalService {
     /** 同意：ANY_ONE 直接进入下一节点；ALL 需全部待审批人通过。 */
     @Transactional
     public ApprovalDetailView approve(Long instanceId, String comment) {
+        SecurityUser actor = permissionService.requireAuthenticated();
         ApprovalPermissionService.PendingApprover context = permissionService.requirePendingApprover(instanceId);
         Instant now = Instant.now();
         context.approver().approve(normalize(comment), now);
@@ -333,6 +339,13 @@ public class ApprovalService {
                         .reason("审批通过（全部节点完成）"));
             }
             instanceRepository.save(instance);
+            if (hasNext) {
+                notifyNodeApprovers(instanceId, nextIndex, instance, actor.id());
+            } else {
+                notificationService.notify(instance.getApplicant().getId(), NotificationType.APPROVAL_APPROVED,
+                        "审批已通过", "「" + instance.getTitle() + "」已通过全部审批节点",
+                        "/approvals/" + instanceId, "APPROVAL", instanceId, actor.id());
+            }
         }
 
         recordAction(instance, node, ApprovalActionType.APPROVE, normalize(comment));
@@ -359,6 +372,9 @@ public class ApprovalService {
                 .resource("APPROVAL", instanceId)
                 .after(Map.of("title", instance.getTitle(), "comment", reason))
                 .reason("审批拒绝"));
+        notificationService.notify(instance.getApplicant().getId(), NotificationType.APPROVAL_REJECTED,
+                "审批被拒绝", "「" + instance.getTitle() + "」：" + reason,
+                "/approvals/" + instanceId, "APPROVAL", instanceId, context.approver().getUser().getId());
         return detail(instanceId);
     }
 
@@ -380,6 +396,9 @@ public class ApprovalService {
                 .resource("APPROVAL", instanceId)
                 .after(Map.of("title", instance.getTitle(), "comment", reason))
                 .reason("审批退回（重新提交后从第一个节点重新审批）"));
+        notificationService.notify(instance.getApplicant().getId(), NotificationType.APPROVAL_RETURNED,
+                "审批被退回，请修改后重新提交", "「" + instance.getTitle() + "」：" + reason,
+                "/approvals/" + instanceId, "APPROVAL", instanceId, context.approver().getUser().getId());
         return detail(instanceId);
     }
 
@@ -442,10 +461,31 @@ public class ApprovalService {
                 .before(Map.of("fromUserId", from.getUser().getId()))
                 .after(Map.of("toUserId", target.getId(), "operatorId", actor.id()))
                 .reason(normalize(request.comment()) == null ? "管理员转交审批" : normalize(request.comment())));
+        notificationService.notify(target.getId(), NotificationType.APPROVAL_PENDING,
+                "有新的审批待你处理（转交）", "「" + instance.getTitle() + "」已转交给你，当前节点："
+                        + node.getName(),
+                "/approvals/" + instanceId, "APPROVAL", instanceId, actor.id());
         return detail(instanceId);
     }
 
     // --- 内部方法 ---------------------------------------------------------------
+
+    /** 通知某节点的待审批人（收件人自动跳过触发者）。 */
+    private void notifyNodeApprovers(Long instanceId, int nodeIndex, ApprovalInstance instance, Long actorId) {
+        nodeRepository.findByInstanceId(instanceId).stream()
+                .filter(node -> node.getNodeIndex() == nodeIndex)
+                .findFirst()
+                .ifPresent(node -> {
+                    List<Long> recipients = approverRepository.findByNodeIds(List.of(node.getId())).stream()
+                            .filter(row -> row.getStatus() == ApproverStatus.PENDING)
+                            .map(row -> row.getUser().getId())
+                            .toList();
+                    notificationService.notifyAll(recipients, NotificationType.APPROVAL_PENDING,
+                            "有新的审批待你处理",
+                            instance.getTitle() + "（当前节点：" + node.getName() + "）",
+                            "/approvals/" + instanceId, "APPROVAL", instanceId, actorId);
+                });
+    }
 
     private ApprovalScope parseScope(String scope) {
         if (scope == null || scope.isBlank()) {

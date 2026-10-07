@@ -24,6 +24,10 @@ import com.easyoa.approval.dto.FormFieldView;
 import com.easyoa.approval.dto.NodeDefinitionView;
 import com.easyoa.approval.repository.ApprovalTemplateRepository;
 import com.easyoa.approval.repository.ApprovalTemplateVersionRepository;
+import com.easyoa.comment.domain.Comment;
+import com.easyoa.comment.domain.CommentVersion;
+import com.easyoa.comment.repository.CommentRepository;
+import com.easyoa.comment.repository.CommentVersionRepository;
 import com.easyoa.organization.domain.OrgMembership;
 import com.easyoa.organization.domain.OrgUnit;
 import com.easyoa.organization.domain.OrgUnitType;
@@ -83,6 +87,8 @@ public class DevDataSeeder implements ApplicationRunner {
     private final ApprovalTemplateRepository approvalTemplateRepository;
     private final ApprovalTemplateVersionRepository approvalTemplateVersionRepository;
     private final ApprovalSchemaCodec approvalSchemaCodec;
+    private final CommentRepository commentRepository;
+    private final CommentVersionRepository commentVersionRepository;
     private final UserService userService;
     private final SystemSettingService systemSettingService;
     private final PasswordEncoder passwordEncoder;
@@ -95,6 +101,7 @@ public class DevDataSeeder implements ApplicationRunner {
             ApprovalTemplateRepository approvalTemplateRepository,
             ApprovalTemplateVersionRepository approvalTemplateVersionRepository,
             ApprovalSchemaCodec approvalSchemaCodec,
+            CommentRepository commentRepository, CommentVersionRepository commentVersionRepository,
             UserService userService, SystemSettingService systemSettingService,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -110,6 +117,8 @@ public class DevDataSeeder implements ApplicationRunner {
         this.approvalTemplateRepository = approvalTemplateRepository;
         this.approvalTemplateVersionRepository = approvalTemplateVersionRepository;
         this.approvalSchemaCodec = approvalSchemaCodec;
+        this.commentRepository = commentRepository;
+        this.commentVersionRepository = commentVersionRepository;
         this.userService = userService;
         this.systemSettingService = systemSettingService;
         this.passwordEncoder = passwordEncoder;
@@ -219,6 +228,17 @@ public class DevDataSeeder implements ApplicationRunner {
         // 前置依赖（未完成 → 看板卡片显示 BLOCKED）
         taskDependencyRepository.save(new TaskDependency(approval, taskModule, root.getId()));
         taskDependencyRepository.save(new TaskDependency(mobile, dataCenter, root.getId()));
+
+        // 演示评论（Phase 5/7：评论与 Activity Feed 展示）
+        seedComment(taskModule, backend, "V4 数据模型已经落地，接下来处理状态流与依赖阻塞。");
+        seedComment(taskModule, frontend, "@Member 看板拖拽的交互我看过了，整体没问题，只在窄屏下需要横向滚动。");
+        seedComment(taskModule, root, "依赖覆盖的审计要确保写入 reason，审计视图里能直接看到原因。");
+    }
+
+    /** 演示评论（Phase 5/7：评论与 Activity Feed 展示）。 */
+    private void seedComment(Task task, User author, String content) {
+        Comment comment = commentRepository.save(new Comment(task, null, author, content));
+        commentVersionRepository.save(new CommentVersion(comment, 1, content, author));
     }
 
     /** 演示审批模板：请假申请（直属主管 → 管理员备案）与采购申请（直属主管 → 财务/管理员）。 */

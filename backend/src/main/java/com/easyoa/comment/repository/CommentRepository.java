@@ -44,4 +44,17 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findReplies(@Param("parentIds") Collection<Long> parentIds);
 
     long countByTaskId(Long taskId);
+
+    /** Activity Feed：最近的有效评论（顶层、未撤回）。 */
+    @Query("""
+            select c from Comment c
+            join fetch c.author
+            join fetch c.task t
+            join fetch t.project p
+            where c.parent is null and c.withdrawnAt is null
+              and (:scopeAll = true or p.id in :projectIds)
+            order by c.createdAt desc, c.id desc
+            """)
+    List<Comment> findRecentForActivity(@Param("scopeAll") boolean scopeAll,
+            @Param("projectIds") Collection<Long> projectIds, Pageable pageable);
 }

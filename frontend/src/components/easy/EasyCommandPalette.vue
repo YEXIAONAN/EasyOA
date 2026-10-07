@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Component } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  CirclePlus,
   DataAnalysis,
   Document,
   Folder,
@@ -16,15 +17,17 @@ import {
   User,
 } from '@element-plus/icons-vue'
 
+import { searchApi } from '@/api/modules/search'
+import type { SearchHit } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useUiStore } from '@/stores/ui'
 
 /**
- * EasyCommandPalette — 全局命令面板（⌘K / Ctrl+K）。
+ * EasyCommandPalette — 全局命令面板（⌘K / Ctrl+K）与全局搜索。
  *
- * v0.1.0 Phase 1：导航 + 已有动作。
- * 跨模块内容检索（任务 / 项目 / 成员 / 审批）与快捷创建将在对应模块交付后接入（Phase 7）。
+ * Phase 7：支持跨模块检索（项目 / 任务 / 成员 / 审批，结果按类别分组并直达内容）
+ * 与快捷动作（创建任务 / 创建项目 / 发起审批）；顶部搜索框复用同一面板。
  */
 interface CommandItem {
   id: string
@@ -45,6 +48,10 @@ const query = ref('')
 const activeIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)
+const searchResults = ref<SearchHit[]>([])
+const searching = ref(false)
+
+let searchTimer: number | null = null
 
 const isMac = computed(() => /Mac|iPhone|iPad/.test(navigator.userAgent))
 
@@ -129,41 +136,122 @@ const commands = computed<CommandItem[]>(() => {
     )
   }
 
-  items.push({
-    id: 'action-logout',
-    title: '退出登录',
-    group: '操作',
-    icon: SwitchButton,
-    keywords: ['logout', 'exit', 'tuichu'],
-    run: () => void handleLogout(),
+  items.push(
+      {
+        id: 'action-create-project',
+        title: '创建项目',
+        group: '快捷动作',
+        icon: CirclePlus,
+        keywords: ['create', 'project', 'chuangjianxiangmu'],
+        run: () => go('projects', { create: '1' }),
+      },
+      {
+        id: 'action-create-approval',
+        title: '发起审批',
+        group: '快捷动作',
+        icon: Stamp,
+        keywords: ['approval', 'create', 'faqishenpi'],
+        run: () => go('approvals', { create: '1' }),
+      },
+      {
+        id: 'action-create-task',
+        title: '创建任务',
+        group: '快捷动作',
+        icon: Tickets,
+        keywords: ['task', 'create', 'chuangjianrenwu'],
+        run: () => go('projects', { create: 'task' }),
+      },
+    )
+
+    items.push({
+      id: 'action-logout',
+      title: '退出登录',
+      group: '操作',
+      icon: SwitchButton,
+      keywords: ['logout', 'exit', 'tuichu'],
+      run: () => void handleLogout(),
+    })
+
+    return items
   })
 
-  return items
-})
+  /** 搜索命中 → 可执行命令（按类别分组，点击直达内容）。 */
+  const searchCommands = computed<CommandItem[]>(() => {
+    const groups: Array<{ group: string; icon: Component; hits: SearchHit[] }> = [
+      { group: '项目', icon: Folder, hits: searchResults.value.filter((hit) => hit.link.startsWith('/projects/') && !hit.link.includes('?')) },
+      { group: '任务', icon: Tickets, hits: searchResults.value.filter((hit) => hit.link.includes('?task=')) },
+      { group: '成员', icon: User, hits: searchResults.value.filter((hit) => hit.link === '/team') },
+      { group: '审批', icon: Stamp, hits: searchResults.value.filter((hit) => hit.link.startsWith('/approvals/')) },
+    ]
+    return groups.flatMap((entry) =>
+      entry.hits.map((hit) => ({
+        id: `search-${entry.group}-${hit.id}`,
+        title: hit.title,
+        group: `搜索 · ${entry.group}`,
+        hint: hit.subtitle ?? undefined,
+        icon: entry.icon,
+        keywords: [],
+        run: () => {
+          ui.closeCommandPalette()
+          void router.push(hit.link)
+        },
+      })),
+    )
+  })
 
-const filtered = computed(() => {
-  const keyword = query.value.trim().toLowerCase()
-  if (!keyword) return commands.value
-  return commands.value.filter(
-    (item) =>
-      item.title.toLowerCase().includes(keyword) ||
-      item.group.includes(keyword) ||
-      item.keywords.some((word) => word.includes(keyword)),
-  )
-})
+  const filtered = computed(() => {
+    const keyword = query.value.trim().toLowerCase()
+    if (!keyword) return commands.value
+    const matchedCommands = commands.value.filter(
+      (item) =>
+        item.title.toLowerCase().includes(keyword) ||
+        item.group.includes(keyword) ||
+        item.keywords.some((word) => word.includes(keyword)),
+    )
+    return [...searchCommands.value, ...matchedCommands]
+  })
 
-const groupedItems = computed(() => {
-  const groups: Array<{ label: string; items: Array<{ item: CommandItem; index: number }> }> = []
-  filtered.value.forEach((item, index) => {
-    let group = groups.find((candidate) => candidate.label === item.group)
-    if (!group) {
-      group = { label: item.group, items: [] }
-      groups.push(group)
+  const groupedItems = computed(() => {
+    const groups: Array<{ label: string; items: Array<{ item: CommandItem; index: number }> }> = []
+    filtered.value.forEach((item, index) => {
+      let group = groups.find((candidate) => candidate.label === item.group)
+      if (!group) {
+        group = { label: item.group, items: [] }
+        groups.push(group)
+      }
+      group.items.push({ item, index })
+    })
+    return groups
+  })
+
+  watch(query, (value) => {
+    activeIndex.value = 0
+    if (searchTimer !== null) {
+      window.clearTimeout(searchTimer)
     }
-    group.items.push({ item, index })
+    const keyword = value.trim()
+    if (keyword.length === 0) {
+      searchResults.value = []
+      searching.value = false
+      return
+    }
+    searching.value = true
+    searchTimer = window.setTimeout(async () => {
+      try {
+        const result = await searchApi.search(keyword)
+        searchResults.value = [
+          ...result.projects,
+          ...result.tasks,
+          ...result.users,
+          ...result.approvals,
+        ]
+      } catch {
+        searchResults.value = []
+      } finally {
+        searching.value = false
+      }
+    }, 250)
   })
-  return groups
-})
 
 watch(filtered, () => {
   activeIndex.value = 0
@@ -186,9 +274,9 @@ watch(activeIndex, () => {
   })
 })
 
-function go(name: string): void {
+function go(name: string, query?: Record<string, string>): void {
   ui.closeCommandPalette()
-  void router.push({ name })
+  void router.push({ name, query })
 }
 
 async function handleLogout(): Promise<void> {
@@ -241,7 +329,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
               ref="inputRef"
               v-model="query"
               class="palette__input"
-              placeholder="搜索页面或动作…"
+              placeholder="搜索页面 / 动作，或输入关键字搜索项目、任务、成员、审批…"
               autocomplete="off"
               spellcheck="false"
               @keydown="onKeydown"
@@ -263,17 +351,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
                 @click="entry.item.run()"
               >
                 <el-icon class="palette__item-icon"><component :is="entry.item.icon" /></el-icon>
-                <span class="palette__item-title">{{ entry.item.title }}</span>
+                <span class="palette__item-body">
+                  <span class="palette__item-title">{{ entry.item.title }}</span>
+                  <span v-if="entry.item.hint" class="palette__item-hint">{{ entry.item.hint }}</span>
+                </span>
               </button>
             </template>
 
-            <div v-if="filtered.length === 0" class="palette__empty">没有匹配的命令</div>
+            <div v-if="filtered.length === 0" class="palette__empty">
+              {{ searching ? '搜索中…' : '没有匹配的结果' }}
+            </div>
           </div>
 
           <div class="palette__footer">
             <span class="palette__footer-key">↑↓ 选择</span>
             <span class="palette__footer-key">↵ 执行</span>
-            <span class="palette__footer-note">全局搜索（任务 / 项目 / 成员 / 审批）将在 Phase 7 接入</span>
+            <span class="palette__footer-note">搜索：项目 / 任务 / 成员 / 审批（点击直达内容）</span>
             <span class="palette__footer-key palette__footer-key--right">{{ isMac ? '⌘K' : 'Ctrl K' }}</span>
           </div>
         </div>
@@ -381,6 +474,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
 .palette__item-icon {
   font-size: 16px;
   color: inherit;
+}
+
+.palette__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.palette__item-hint {
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .palette__empty {

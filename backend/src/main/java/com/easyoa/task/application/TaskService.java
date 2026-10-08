@@ -30,6 +30,7 @@ import com.easyoa.common.security.SecurityUser;
 import com.easyoa.notification.application.NotificationService;
 import com.easyoa.notification.domain.NotificationType;
 import com.easyoa.project.application.ProjectPermissionService;
+import com.easyoa.project.application.ProjectScope;
 import com.easyoa.project.domain.Project;
 import com.easyoa.project.domain.ProjectRole;
 import com.easyoa.project.repository.ProjectMemberRepository;
@@ -44,6 +45,7 @@ import com.easyoa.task.domain.TaskStatusType;
 import com.easyoa.task.dto.ChangeTaskStatusRequest;
 import com.easyoa.task.dto.CreateSubtaskRequest;
 import com.easyoa.task.dto.CreateTaskRequest;
+import com.easyoa.task.dto.MemberTaskBrief;
 import com.easyoa.task.dto.TaskBoardResponse;
 import com.easyoa.task.dto.TaskCardResponse;
 import com.easyoa.task.dto.TaskDetailResponse;
@@ -201,6 +203,31 @@ public class TaskService {
     @Transactional(readOnly = true)
     public List<TaskCardResponse> recentMyTasks(Long userId, int limit) {
         return myTasks(userId, MyTaskQuery.of("OPEN", null, 1, limit)).items();
+    }
+
+    /** 成员档案「近期任务」：目标成员未结束的任务，限定在查看者可见的项目范围内。 */
+    @Transactional(readOnly = true)
+    public List<MemberTaskBrief> memberRecentTasks(Long targetUserId, ProjectScope scope, int limit) {
+        if (scope.isEmpty()) {
+            return List.of();
+        }
+        // 不受限（管理员）时传哨兵值：query 内由 allProjects 短路，避免空 in () 语句
+        List<Long> projectIds = scope.unrestricted() ? List.of(-1L) : List.copyOf(scope.projectIds());
+        Instant now = Instant.now();
+        return taskRepository.findMemberOpenTasks(targetUserId, scope.unrestricted(), projectIds,
+                        AssignmentState.ACTIVE, FINISHED_TYPES, PageRequest.of(0, limit)).stream()
+                .map(task -> new MemberTaskBrief(
+                        task.getId(),
+                        task.getProject().getId(),
+                        task.getProject().getName(),
+                        task.getTitle(),
+                        task.getStatus().getName(),
+                        task.getStatus().getSystemType().name(),
+                        task.getPriority().name(),
+                        task.getProgress(),
+                        task.getPlannedEndAt(),
+                        task.getPlannedEndAt() != null && task.getPlannedEndAt().isBefore(now)))
+                .toList();
     }
 
     /** 工作台 KPI：未结束任务数。 */

@@ -1,5 +1,8 @@
 package com.easyoa.project.application;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,6 +67,22 @@ public class ProjectPermissionService {
         }
         // 与「不存在」保持同一响应，避免通过状态码差异探测项目是否存在
         throw ApiException.notFound("项目不存在或无权访问");
+    }
+
+    /**
+     * 当前查看者的项目数据范围（用于聚合视图的批量过滤，例如成员档案的参与项目 / 近期任务）。
+     *
+     * <p>与 {@link #requireViewable(Long)} 使用同一套规则：项目成员可见，系统管理员可见全部。
+     */
+    @Transactional(readOnly = true)
+    public ProjectScope scopeOf(SecurityUser viewer) {
+        if (viewer == null) {
+            return ProjectScope.of(Set.of());
+        }
+        if (viewer.systemRole().isAdminLike()) {
+            return ProjectScope.all();
+        }
+        return ProjectScope.of(new HashSet<>(projectMemberRepository.findProjectIdsByUserId(viewer.id())));
     }
 
     /** 项目日常管理（信息 / 状态 / 成员）：OWNER 或 DEPUTY_OWNER。 */

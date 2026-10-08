@@ -238,6 +238,39 @@ export interface MemberContact {
   phone?: string
 }
 
+/** 成员参与的项目（档案侧栏「参与项目」；已按查看者数据范围过滤） */
+export interface MemberProjectItem {
+  projectId: number
+  name: string
+  status: ProjectStatus
+  progress: number
+  role: ProjectRole
+}
+
+/** 成员近期任务（档案侧栏「近期任务」；只读摘要，不含权限位） */
+export interface MemberTaskItem {
+  taskId: number
+  projectId: number
+  projectName: string
+  title: string
+  statusName: string
+  statusType: TaskStatusType
+  priority: TaskPriority
+  progress: number
+  plannedEndAt?: string | null
+  overdue: boolean
+}
+
+/**
+ * 成员协作概览（与档案分开加载）。
+ *
+ * 服务端已按查看者的数据范围过滤：非管理员只能看到自己同样可见的项目与任务。
+ */
+export interface MemberCollaboration {
+  projects: MemberProjectItem[]
+  recentTasks: MemberTaskItem[]
+}
+
 export interface MemberProfile {
   id: number
   username: string

@@ -143,6 +143,33 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     long countMyOpenTasks(@Param("userId") Long userId, @Param("state") AssignmentState state,
             @Param("finishedTypes") Collection<TaskStatusType> finishedTypes);
 
+    /**
+     * 成员近期任务（主负责人 / 副负责人 / 协作成员），限定在给定项目范围内。
+     *
+     * <p>与「我的任务」不同：这是查看他人的只读摘要，调用方必须传入已经过数据范围
+     * 收敛的项目 ID。{@code allProjects=true} 表示不受限（系统管理员）；
+     * 此时 {@code projectIds} 仍需传入非空集合（调用方传哨兵值），
+     * 避免生成 PostgreSQL 无法解析的空 {@code in ()} 语句。
+     */
+    @Query("""
+            select t from Task t
+            join fetch t.status
+            join fetch t.project
+            where (:allProjects = true or t.project.id in :projectIds)
+              and t.assignmentState = :state
+              and (t.primaryAssignee.id = :userId
+                   or t.deputyAssignee.id = :userId
+                   or exists (select c.id from TaskCollaborator c where c.task = t and c.user.id = :userId))
+              and t.status.systemType not in :finishedTypes
+            order by t.plannedEndAt asc nulls last, t.updatedAt desc
+            """)
+    List<Task> findMemberOpenTasks(@Param("userId") Long userId,
+            @Param("allProjects") boolean allProjects,
+            @Param("projectIds") Collection<Long> projectIds,
+            @Param("state") AssignmentState state,
+            @Param("finishedTypes") Collection<TaskStatusType> finishedTypes,
+            Pageable pageable);
+
     /** 「即将到期」KPI：未结束且截止时间在阈值之前的任务数（含已逾期）。 */
     @Query("""
             select count(t) from Task t

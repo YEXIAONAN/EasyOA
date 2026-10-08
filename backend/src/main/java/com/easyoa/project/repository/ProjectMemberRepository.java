@@ -42,4 +42,11 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     /** 用户参与的项目 ID（用于数据范围判断）。 */
     @Query("select m.project.id from ProjectMember m where m.user.id = :userId")
     List<Long> findProjectIdsByUserId(@Param("userId") Long userId);
+
+    /** 指定用户的项目参与记录（含项目信息，用于成员档案的「参与项目」区块）。 */
+    @Query("""
+            select m from ProjectMember m join fetch m.project
+            where m.user.id = :userId
+            """)
+    List<ProjectMember> findByUserIdWithProject(@Param("userId") Long userId);
 }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { OfficeBuilding, Search } from '@element-plus/icons-vue'
 
 import { ApiError } from '@/api/errors'
 import { userApi } from '@/api/modules/users'
-import type { MemberCard, MemberProfile, SystemRole, UserStatus } from '@/api/types'
+import { workspaceApi } from '@/api/modules/workspace'
+import type { MemberCard, MemberCollaboration, MemberProfile, SystemRole, UserStatus } from '@/api/types'
 import EasyAvatar from '@/components/easy/EasyAvatar.vue'
 import EasyButton from '@/components/easy/EasyButton.vue'
 import EasyDialog from '@/components/easy/EasyDialog.vue'
@@ -18,6 +20,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { formatDate, formatDateTime, formatRelative } from '@/utils/format'
 import { systemRoleLabel } from '@/utils/permission'
+import { projectRoleLabel, projectStatusLabel, projectStatusTone } from '@/utils/project'
+import { taskPriorityLabel, taskPriorityTone, taskStatusTypeTone } from '@/utils/task'
 
 /**
  * 团队页面：成员目录（卡片式，非后台表格）。
@@ -26,6 +30,7 @@ import { systemRoleLabel } from '@/utils/permission'
  */
 const auth = useAuthStore()
 const notification = useNotificationStore()
+const router = useRouter()
 const { flatOptions, load: loadTree } = useOrgTree()
 
 const keyword = ref('')
@@ -89,19 +94,44 @@ watch(page, () => void loadMembers())
 const drawerOpen = ref(false)
 const profile = ref<MemberProfile | null>(null)
 const profileLoading = ref(false)
+/** 参与项目 / 近期任务：由 workspace 聚合层提供，服务端已按查看者数据范围过滤 */
+const collaboration = ref<MemberCollaboration | null>(null)
 
 async function openProfile(userId: number): Promise<void> {
   drawerOpen.value = true
   profileLoading.value = true
   profile.value = null
+  collaboration.value = null
   try {
-    profile.value = await userApi.profile(userId)
+    // 两个请求并行：档案（身份 / 组织 / 联系方式）与协作概览（项目 / 任务）
+    const [loadedProfile, loadedCollaboration] = await Promise.all([
+      userApi.profile(userId),
+      workspaceApi.memberCollaboration(userId).catch(() => null),
+    ])
+    profile.value = loadedProfile
+    collaboration.value = loadedCollaboration
   } catch (error) {
     notification.error(error)
     drawerOpen.value = false
   } finally {
     profileLoading.value = false
   }
+}
+
+/** 深链到项目详情（新标签式跳转保持在应用内，档案侧栏随之关闭） */
+function openProject(projectId: number): void {
+  drawerOpen.value = false
+  void router.push({ name: 'project-detail', params: { id: String(projectId) } })
+}
+
+/** 深链到看板中的任务详情侧栏（URL 形如 /projects/1/board?task=11） */
+function openTask(projectId: number, taskId: number): void {
+  drawerOpen.value = false
+  void router.push({
+    name: 'project-board',
+    params: { id: String(projectId) },
+    query: { task: String(taskId) },
+  })
 }
 
 // --- 新建成员（管理员） ------------------------------------------------------
@@ -335,13 +365,74 @@ const roleTone = (role: SystemRole): 'brand' | 'warning' | 'neutral' => {
         </section>
 
         <section class="profile__section">
-          <h3 class="profile__section-title">参与项目</h3>
-          <p class="profile__empty">项目模块将在 Phase 3 交付，届时在此展示该成员参与的项目与角色。</p>
+          <h3 class="profile__section-title">
+            参与项目
+            <span v-if="collaboration" class="profile__section-count">{{ collaboration.projects.length }}</span>
+          </h3>
+          <div v-if="collaboration && collaboration.projects.length > 0" class="profile__projects">
+            <button
+              v-for="item in collaboration.projects"
+              :key="item.projectId"
+              type="button"
+              class="profile__project"
+              @click="openProject(item.projectId)"
+            >
+              <div class="profile__project-head">
+                <span class="profile__project-name">{{ item.name }}</span>
+                <EasyStatus :label="projectStatusLabel(item.status)" :tone="projectStatusTone(item.status)" />
+              </div>
+              <div class="profile__project-meta">
+                <span>{{ projectRoleLabel(item.role) }}</span>
+                <span>进度 {{ item.progress }}%</span>
+              </div>
+            </button>
+          </div>
+          <p v-else-if="collaboration" class="profile__empty">
+            该成员尚未参与任何项目（或你无权查看其所在项目）。
+          </p>
+          <p v-else class="profile__empty">协作数据暂时无法加载，请稍后重试。</p>
         </section>
 
         <section class="profile__section">
-          <h3 class="profile__section-title">近期任务</h3>
-          <p class="profile__empty">任务模块将在 Phase 4 交付，届时在此展示该成员近期任务与进度。</p>
+          <h3 class="profile__section-title">
+            近期任务
+            <span v-if="collaboration" class="profile__section-count">{{ collaboration.recentTasks.length }}</span>
+          </h3>
+          <div v-if="collaboration && collaboration.recentTasks.length > 0" class="profile__tasks">
+            <button
+              v-for="item in collaboration.recentTasks"
+              :key="item.taskId"
+              type="button"
+              class="profile__task"
+              @click="openTask(item.projectId, item.taskId)"
+            >
+              <div class="profile__task-head">
+                <span class="profile__task-title">{{ item.title }}</span>
+                <span class="profile__task-status" :class="`is-${taskStatusTypeTone(item.statusType)}`">
+                  {{ item.statusName }}
+                </span>
+              </div>
+              <div class="profile__task-meta">
+                <span>{{ item.projectName }}</span>
+                <EasyStatus
+                  :label="taskPriorityLabel(item.priority)"
+                  :tone="taskPriorityTone(item.priority)"
+                  subtle
+                />
+                <span v-if="item.plannedEndAt" :class="{ 'is-danger': item.overdue }">
+                  {{ item.overdue ? '已逾期' : '截止' }} {{ formatDate(item.plannedEndAt) }}
+                </span>
+                <span>进度 {{ item.progress }}%</span>
+              </div>
+            </button>
+          </div>
+          <p v-else-if="collaboration" class="profile__empty">
+            该成员当前没有进行中的任务。
+          </p>
+          <p v-else class="profile__empty">协作数据暂时无法加载，请稍后重试。</p>
+          <p v-if="collaboration" class="profile__hint">
+            仅展示未结束的任务；非管理员只能看到与自己同项目的内容。
+          </p>
         </section>
 
         <section class="profile__section">
@@ -606,9 +697,106 @@ const roleTone = (role: SystemRole): 'brand' | 'warning' | 'neutral' => {
 }
 
 .profile__section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-2);
   font-size: var(--easy-text-sm);
   font-weight: 600;
   color: var(--easy-text-1);
+}
+
+.profile__section-count {
+  padding: 0 6px;
+  border-radius: var(--easy-radius-full);
+  background: var(--easy-surface-sunken);
+  color: var(--easy-text-3);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.profile__hint {
+  margin-top: var(--easy-space-2);
+  color: var(--easy-text-3);
+  font-size: 10px;
+  line-height: var(--easy-leading-relaxed);
+}
+
+.profile__projects,
+.profile__tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-2);
+}
+
+.profile__project,
+.profile__task {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: var(--easy-space-3);
+  border: 1px solid var(--easy-border);
+  border-radius: var(--easy-radius-md);
+  background: var(--easy-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--easy-transition-fast), border-color var(--easy-transition-fast);
+}
+
+.profile__project:hover,
+.profile__task:hover {
+  background: var(--easy-surface-hover);
+  border-color: var(--easy-border-strong);
+}
+
+.profile__project-head,
+.profile__task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--easy-space-2);
+}
+
+.profile__project-name,
+.profile__task-title {
+  font-size: var(--easy-text-sm);
+  font-weight: 500;
+  color: var(--easy-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile__task-status {
+  flex: none;
+  font-size: var(--easy-text-xs);
+  color: var(--easy-text-2);
+}
+
+.profile__task-status.is-brand {
+  color: var(--easy-brand-text);
+}
+
+.profile__task-status.is-warning {
+  color: var(--easy-warning);
+}
+
+.profile__task-status.is-success {
+  color: var(--easy-success);
+}
+
+.profile__project-meta,
+.profile__task-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--easy-space-3);
+  color: var(--easy-text-3);
+  font-size: var(--easy-text-xs);
+  flex-wrap: wrap;
+}
+
+.profile__task-meta .is-danger {
+  color: var(--easy-danger);
 }
 
 .profile__org {

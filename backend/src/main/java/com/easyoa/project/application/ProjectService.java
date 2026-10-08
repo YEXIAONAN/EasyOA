@@ -2,6 +2,7 @@ package com.easyoa.project.application;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import com.easyoa.project.domain.ProjectMember;
 import com.easyoa.project.domain.ProjectRole;
 import com.easyoa.project.domain.ProjectStatus;
 import com.easyoa.project.dto.CreateProjectRequest;
+import com.easyoa.project.dto.MemberProjectBrief;
 import com.easyoa.project.dto.ProjectCardResponse;
 import com.easyoa.project.dto.ProjectDetailResponse;
 import com.easyoa.project.dto.ProjectMemberView;
@@ -44,6 +46,11 @@ import com.easyoa.user.domain.User;
  */
 @Service
 public class ProjectService {
+
+    /** 成员档案「参与项目」排序：进行中优先，归档最后，同组内按项目名。 */
+    private static final Comparator<ProjectMember> MEMBER_PROJECT_ORDER = Comparator
+            .comparingInt((ProjectMember member) -> projectRank(member.getProject().getStatus()))
+            .thenComparing(member -> member.getProject().getName(), Comparator.naturalOrder());
 
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
@@ -346,9 +353,37 @@ public class ProjectService {
         return cards;
     }
 
+    /**
+     * 成员档案「参与项目」：目标成员参与的项目，并按查看者的数据范围过滤。
+     *
+     * <p>返回顺序：进行中的项目优先，已归档的排最后（保留历史可见性，
+     * 但不让归档项目占据档案侧栏的主要位置）。
+     */
+    @Transactional(readOnly = true)
+    public List<MemberProjectBrief> memberProjects(Long targetUserId, ProjectScope scope) {
+        return projectMemberRepository.findByUserIdWithProject(targetUserId).stream()
+                .filter(member -> scope.covers(member.getProject().getId()))
+                .sorted(MEMBER_PROJECT_ORDER)
+                .map(member -> new MemberProjectBrief(
+                        member.getProject().getId(),
+                        member.getProject().getName(),
+                        member.getProject().getStatus().name(),
+                        member.getProject().getProgress(),
+                        member.getRole().name()))
+                .toList();
+    }
+
     /** 活跃项目数量（工作台 KPI）。 */
     @Transactional(readOnly = true)
     public long countActiveProjects(Long userId) {
         return projectRepository.countByUserAndStatus(userId, ProjectStatus.ACTIVE);
+    }
+
+    private static int projectRank(ProjectStatus status) {
+        return switch (status) {
+            case ARCHIVED -> 2;
+            case COMPLETED -> 1;
+            default -> 0;
+        };
     }
 }

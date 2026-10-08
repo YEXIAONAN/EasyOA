@@ -32,7 +32,7 @@ EasyOA 优先保证：
 | 1 | 项目协作体验 | 项目 / 任务 / 看板 / 侧栏详情，而不是表格堆砌 |
 | 2 | 数据安全 | 后端强制鉴权、附件鉴权下载、Session 化认证 |
 | 3 | 权限边界 | 系统角色 / 项目角色 / 任务角色 / 资源归属统一计算 |
-| 4 | 操作可追溯 | 审计日志与安全事件 Append Only，永不删除 |
+| 4 | 操作可追溯 | 常规审计与安全事件只追加；ROOT 审计保留期清理须走高危操作通道并记录安全事件 |
 | 5 | UI/UX 质量 | Easy 系列设计令牌 + 自有组件层，摆脱后台模板感 |
 | 6 | 私有化部署体验 | `docker compose up -d` 即可自建，数据留在自己服务器 |
 | 7 | 后期可维护性 | 模块化单体（Modular Monolith）+ 迁移脚本 + CI |
@@ -164,7 +164,7 @@ EasyOA 优先保证：
 - **审批实例状态机**：DRAFT → PENDING → APPROVED / REJECTED / RETURNED / CANCELLED；进入 PENDING 后申请人不可修改表单（只能撤回或等待退回）
 - **多人审批**：节点支持 **ANY_ONE**（任一通过）与 **ALL**（全部通过）；当前不做 2/3、60% 投票等复杂规则
 - **动态审批人**：FIXED_USER / DIRECT_MANAGER（沿组织链向上、跳过申请人）/ PRIMARY_DEPT_MANAGER / ORG_UNIT_MANAGER / PROJECT_OWNER / PROJECT_DEPUTY / SYSTEM_ROLE；**发起时解析并生成审批人快照**，组织变化不影响运行中的实例
-- **自我审批禁止**：解析结果过滤申请人本人 → 命中模板覆盖的备用规则 → 系统默认递补链（主部门负责人 → ADMIN → ROOT）；仍无法解析**禁止提交**（「审批流程配置不完整，请联系管理员」），绝不静默跳过节点
+- **自我审批禁止**：解析结果过滤申请人本人 → 命中模板覆盖的备用规则 → 系统默认递补链（通常为 ADMIN → ROOT；SYSTEM_ROLE 规则回退到 ROOT）；仍无法解析**禁止提交**（「审批流程配置不完整，请联系管理员」），绝不静默跳过节点
 - **退回与重新提交**：审批人退回后申请人修改表单，**从第一个节点重新审批**（禁止从退回节点继续）；拒绝与退回必须填写原因
 - **转交**：仅系统管理员可转交（原审批人 TRANSFERRED_OUT、新审批人快照标记来源），写入 CRITICAL 级审计
 - **审批历史**：approval_actions 只追加，审批详情以业务语言展示流程（申请人 ✓ → 部门负责人 ●审批中 → 财务 ○等待），不暴露技术概念；审批附件走受控下载（认证 → 实例可见性 → 文件权限）
@@ -337,7 +337,7 @@ cd frontend && npm install && npm run dev           # http://localhost:5173
 | 变量 | 必填 | 说明 |
 | ---- | ---- | ---- |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | ✅ | 数据库连接与凭据 |
-| `EASYOA_SESSION_SECRET` | ✅ | 会话签名与未来敏感字段加密主密钥，长度 ≥ 32 |
+| `EASYOA_SESSION_SECRET` | ✅ | 会话 HMAC 主密钥，长度 ≥ 32；当前 TOTP 加密密钥也由它派生（与开发宪法的密钥分离规则存在差异，需单独审核） |
 | `EASYOA_BASE_URL` | ➖ | 对外访问地址（文档与链接生成） |
 | `EASYOA_PROFILE` | ➖ | `prod`（默认） / `dev` |
 | `EASYOA_SESSION_TIMEOUT_MINUTES` | ➖ | 会话有效期，默认 480 分钟 |
@@ -380,9 +380,10 @@ cd frontend && npm install && npm run dev           # http://localhost:5173
 
 ### 审计与安全事件
 
-- `audit_logs` 与 `security_events` 为 **Append Only**：应用服务只提供 create/query，
-  仓储接口在类型层面就没有 delete/update 能力；
-- 任何用户（含 ROOT、ADMIN）都不得删除审计记录；
+- `audit_logs` 与 `security_events` 的常规写入路径为 **Append Only**：
+  仓储接口在类型层面没有 delete/update 能力，普通业务操作不提供修改或删除入口；
+- ROOT 可通过 `SensitiveOperationService` 按保留期清理审计日志，需密码、TOTP、原因、
+  影响范围与逐字确认，并记录安全事件；`security_events` 不提供删除路径；
 - 记录字段包含 actor、action、resource、before/after、reason、IP、UA、requestId、riskLevel；
 - 安全事件额外保留 `previous_hash` / `entry_hash` 哈希链字段。
 

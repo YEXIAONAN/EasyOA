@@ -64,4 +64,18 @@ release/
 *.tar.gz
 *.zip
 
+# ---------------------------------------------------------------------------
+# Local AI Agent Skills
+# ---------------------------------------------------------------------------
+# EasyOAAgent.md / AGENTS.md are repository policies and MUST be committed.
+# Local skills are workstation-specific and must never be pushed to GitHub.
+
+.agents/skills/
+.claude/skills/
+
+# Local AI scratch / temporary context
+.ai-local/
+.agent-cache/
+
+AGENTS.md
 EasyOAAgent.md

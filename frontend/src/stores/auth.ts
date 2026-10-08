@@ -32,7 +32,9 @@ export const useAuthStore = defineStore('auth', () => {
       setupRequired.value = status.required
       if (!status.required) {
         try {
-          user.value = await authApi.me()
+          // silent401：未登录是启动探测的预期结果，交给路由守卫决定是否跳转，
+          // 避免全局 401 处理器抢先跳转并丢失 redirect 目标
+          user.value = await authApi.me(true)
         } catch {
           user.value = null
         }

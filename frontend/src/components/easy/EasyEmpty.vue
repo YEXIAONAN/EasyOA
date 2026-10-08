@@ -9,8 +9,6 @@ withDefaults(
   defineProps<{
     title: string
     description?: string
-    /** 模块交付阶段标记（占位页使用） */
-    phase?: string
     compact?: boolean
   }>(),
   { compact: false },
@@ -34,10 +32,7 @@ withDefaults(
       />
     </svg>
     <div class="easy-empty__text">
-      <div class="easy-empty__title">
-        {{ title }}
-        <span v-if="phase" class="easy-empty__phase">{{ phase }}</span>
-      </div>
+      <div class="easy-empty__title">{{ title }}</div>
       <p v-if="description" class="easy-empty__description">{{ description }}</p>
     </div>
     <div v-if="$slots.action" class="easy-empty__action">
@@ -66,22 +61,9 @@ withDefaults(
 }
 
 .easy-empty__title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--easy-space-2);
   font-size: var(--easy-text-base);
   font-weight: 600;
   color: var(--easy-text-1);
-}
-
-.easy-empty__phase {
-  padding: 1px 8px;
-  border: 1px solid var(--easy-border-strong);
-  border-radius: var(--easy-radius-full);
-  background: var(--easy-surface);
-  font-size: var(--easy-text-xs);
-  font-weight: 500;
-  color: var(--easy-text-3);
 }
 
 .easy-empty__description {

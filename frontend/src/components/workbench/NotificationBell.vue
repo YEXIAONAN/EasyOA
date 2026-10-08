@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
   padding: 0 4px;
   border-radius: var(--easy-radius-full);
   background: var(--easy-danger);
-  color: #fff;
+  color: var(--easy-text-inverse);
   font-size: 10px;
   line-height: 15px;
   text-align: center;

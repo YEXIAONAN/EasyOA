@@ -384,7 +384,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
   justify-content: center;
   align-items: flex-start;
   padding-top: 16vh;
-  background: rgba(15, 23, 42, 0.32);
+  background: var(--easy-overlay);
   backdrop-filter: blur(2px);
 }
 

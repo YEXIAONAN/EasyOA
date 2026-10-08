@@ -11,6 +11,7 @@ import EasyEmpty from '@/components/easy/EasyEmpty.vue'
 import EasyInput from '@/components/easy/EasyInput.vue'
 import EasyStatus from '@/components/easy/EasyStatus.vue'
 import MfaEnrollmentDialog from '@/components/security/MfaEnrollmentDialog.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { formatDateTime, formatRelative } from '@/utils/format'
 
@@ -19,6 +20,7 @@ import { formatDateTime, formatRelative } from '@/utils/format'
  *
  * 系统设置（安全策略 / ROOT 高危操作）在「系统设置」中，仅管理员可见。
  */
+const auth = useAuthStore()
 const notification = useNotificationStore()
 
 const mfa = ref<MfaStatus | null>(null)
@@ -143,6 +145,10 @@ async function revoke(session: SessionSummary): Promise<void> {
             <h2 class="section__title">登录设备</h2>
             <p class="section__desc">当前账号的活跃会话；非本人设备请立即下线并修改密码。</p>
           </div>
+          <div class="section__meta">
+            <span>上次登录 {{ formatDateTime(auth.user?.lastLoginAt) }}</span>
+            <span>{{ formatRelative(auth.user?.lastLoginAt) }}</span>
+          </div>
         </div>
 
         <ul v-if="sessions.length > 0" class="session-list">
@@ -257,6 +263,16 @@ async function revoke(session: SessionSummary): Promise<void> {
   border-radius: var(--easy-radius-md);
   background: var(--easy-warning-bg, var(--easy-surface-sunken));
   color: var(--easy-warning);
+  font-size: var(--easy-text-xs);
+}
+
+.section__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+  color: var(--easy-text-3);
   font-size: var(--easy-text-xs);
 }
 

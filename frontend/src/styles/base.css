@@ -171,6 +171,11 @@ button {
   font-family: var(--easy-font-mono);
 }
 
+/* 图标紧贴文字时的标准间距（避免在模板里写内联 margin） */
+.easy-icon-lead {
+  margin-right: var(--easy-space-1);
+}
+
 /* --- 状态点 / 徽标 --------------------------------------------------------- */
 .easy-dot {
   display: inline-block;

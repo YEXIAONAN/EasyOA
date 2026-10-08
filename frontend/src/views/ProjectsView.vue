@@ -181,7 +181,7 @@ const activeCount = computed(
         </p>
       </div>
       <EasyButton variant="primary" @click="openCreate">
-        <el-icon style="margin-right: 4px"><Plus /></el-icon>
+        <el-icon class="easy-icon-lead"><Plus /></el-icon>
         新建项目
       </EasyButton>
     </header>
@@ -272,7 +272,7 @@ const activeCount = computed(
     <div v-else class="easy-card">
       <EasyEmpty
         title="还没有项目"
-        description="创建第一个项目后，你可以管理成员、跟踪进度，并在 Phase 4 交付后使用看板与任务管理。"
+        description="创建第一个项目后，你可以管理成员、跟踪进度，并通过看板与任务列表推进执行。"
       >
         <template #action>
           <EasyButton variant="primary" @click="openCreate">新建项目</EasyButton>

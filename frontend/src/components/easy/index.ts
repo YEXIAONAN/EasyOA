@@ -13,10 +13,11 @@ import { confirmAction } from './easyConfirm'
 /**
  * EasyOA 设计系统组件出口。
  *
- * Phase 1：Button / Input / Avatar / Empty / Dialog
- * Phase 2：Drawer（成员档案） / Select（筛选与表单） / Status（状态标签） / Confirm（危险操作）
+ * 基础组件：Avatar / Button / Input / Select / Status / Empty
+ * 容器组件：Dialog（Modal）/ Drawer（Side Panel）
+ * 交互能力：Confirm（危险操作确认）、CommandPalette（命令面板，见 components/easy/EasyCommandPalette.vue）
  *
- * EasyTable / EasyMemberPicker 将随其消费方模块（Phase 3/4）交付。
+ * 设计原则：组件只承载样式与交互，不承载业务规则；Element Plus 仅作底层实现。
  */
 export const easyComponents: Record<string, Component> = {
   EasyAvatar,

@@ -37,10 +37,7 @@ import { taskPriorityLabel, taskPriorityTone, taskStatusTypeTone } from '@/utils
 /**
  * 项目详情页（工作区）。
  *
- * Tab：概览 / 看板 / 任务 / 时间线 / 成员 / 设置
- * - 概览、成员、设置在 Phase 3 交付；
- * - 看板（拖拽 + 依赖阻塞）、任务列表、任务详情右侧 Drawer 在 Phase 4 交付；
- * - 时间线留待后续版本。
+ * Tab：概览 / 看板 / 任务 / 成员 / 设置
  *
  * URL 同步：
  * - Tab：看板使用 /projects/:id/board，其余 Tab 使用 ?tab=xxx；
@@ -56,7 +53,7 @@ const detail = ref<ProjectDetail | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 
-const tabs = ['overview', 'board', 'tasks', 'timeline', 'members', 'settings'] as const
+const tabs = ['overview', 'board', 'tasks', 'members', 'settings'] as const
 type TabName = (typeof tabs)[number]
 const activeTab = ref<TabName>('overview')
 const BOARD_ROUTE = 'project-board'
@@ -149,7 +146,7 @@ async function saveProgress(): Promise<void> {
   }
 }
 
-// --- 概览：任务统计（Phase 4） ------------------------------------------------
+// --- 概览：任务统计 ------------------------------------------------------------
 const taskStats = ref<{ total: number; byType: Record<TaskStatusType, number>; overdue: number; blocked: number } | null>(null)
 
 async function loadTaskOverview(): Promise<void> {
@@ -324,7 +321,7 @@ async function transferOwner(member: ProjectMemberView): Promise<void> {
   }
 }
 
-// --- 看板（Phase 4） ---------------------------------------------------------
+// --- 看板 -------------------------------------------------------------------
 const boardRef = ref<InstanceType<typeof TaskBoard> | null>(null)
 const drawerRef = ref<InstanceType<typeof TaskDetailDrawer> | null>(null)
 const createOpen = ref(false)
@@ -385,7 +382,7 @@ function onTaskCreated(): void {
   if (activeTab.value === 'tasks') void loadTaskList()
 }
 
-// --- 任务列表（Phase 4） ------------------------------------------------------
+// --- 任务列表 ----------------------------------------------------------------
 const taskStatuses = ref<TaskStatusView[]>([])
 const taskPage = ref<PageResult<TaskCard> | null>(null)
 const taskListLoading = ref(false)
@@ -721,16 +718,6 @@ watch(activeTab, (tab) => {
               compact
               title="没有符合条件的任务"
               description="尝试调整筛选条件，或在看板中创建新任务。"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="时间线" name="timeline">
-          <div class="easy-card">
-            <EasyEmpty
-              title="时间线将在后续版本交付"
-              phase="Phase 7"
-              description="基于任务计划与实际时间的甘特式时间线将随工作台阶段交付。"
             />
           </div>
         </el-tab-pane>
@@ -1258,7 +1245,7 @@ watch(activeTab, (tab) => {
   gap: var(--easy-space-3);
 }
 
-/* --- 任务概览（Phase 4） ------------------------------------------------------ */
+/* --- 任务概览 ---------------------------------------------------------------- */
 .task-stats {
   display: flex;
   flex-direction: column;
@@ -1316,7 +1303,7 @@ watch(activeTab, (tab) => {
   gap: var(--easy-space-3);
 }
 
-/* --- 任务列表（Phase 4） ------------------------------------------------------ */
+/* --- 任务列表 ---------------------------------------------------------------- */
 .task-panel {
   display: flex;
   flex-direction: column;

@@ -10,7 +10,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 
 /**
- * 登录页。认证完全依赖后端 Session Cookie，前端不保存任何 Token。
+ * 登录页。
+ *
+ * 认证完全依赖后端 Session Cookie，前端不保存任何 Token。
+ * 页面只呈现品牌与登录表单：不展示功能宣传清单，也不输出任何开发环境账号信息
+ * （演示账号仅由后端 dev profile 的种子数据提供，见 README）。
  */
 const router = useRouter()
 const route = useRoute()
@@ -22,8 +26,6 @@ const submitting = ref(false)
 const formError = ref<string | null>(null)
 /** 后端返回 TOTP_REQUIRED 后展示动态验证码输入（账号已绑定动态口令） */
 const totpRequired = ref(false)
-
-const isDev = import.meta.env.DEV
 
 onMounted(() => {
   // 仅在缺少 CSRF Cookie 时引导一次，避免多余请求与页面跳转造成的中断噪声
@@ -78,9 +80,9 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="auth">
-    <section class="auth__brand">
+    <aside class="auth__brand">
       <div class="auth__brand-inner">
-        <div class="auth__logo-row">
+        <div class="auth__wordmark">
           <svg class="auth__logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect width="32" height="32" rx="9" fill="var(--easy-brand)" />
             <path
@@ -91,79 +93,82 @@ async function submit(): Promise<void> {
               stroke-linejoin="round"
             />
           </svg>
-          <div>
-            <div class="auth__product">EasyOA</div>
-            <div class="auth__product-sub">企业协同办公平台</div>
+          <div class="auth__wordmark-text">
+            <span class="auth__product">EasyOA</span>
+            <span class="auth__product-sub">企业协同办公平台</span>
           </div>
         </div>
 
-        <h2 class="auth__headline">让团队专注在真正重要的事情上</h2>
-        <p class="auth__subline">
-          项目协作 → 任务执行 → 团队沟通 → 审批流转 → 组织管理 → 安全审计
-        </p>
-
-        <ul class="auth__features">
-          <li>项目与任务闭环，进度一目了然</li>
-          <li>模板化审批，流程可追溯</li>
-          <li>完整的审计与安全事件记录</li>
-        </ul>
-
-        <p class="auth__footnote">私有化部署 · 数据始终留在你自己的服务器上</p>
+        <p class="auth__tagline">让协作更高效，让工作更有序。</p>
       </div>
-    </section>
+      <div class="auth__brand-ornament" aria-hidden="true" />
+    </aside>
 
     <section class="auth__panel">
-      <div class="auth__card">
-        <header class="auth__card-header">
-          <h1 class="auth__title">登录</h1>
-          <p class="auth__desc">使用你的 EasyOA 账号继续</p>
-        </header>
+      <div class="auth__panel-inner">
+        <!-- 窄屏下的品牌标识：左栏隐藏后仍保留产品识别 -->
+        <div class="auth__compact-brand">
+          <svg class="auth__logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect width="32" height="32" rx="9" fill="var(--easy-brand)" />
+            <path
+              d="M9.5 16.6l4.2 4.2 8.8-9.4"
+              stroke="#fff"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="auth__product">EasyOA</span>
+        </div>
 
-        <form class="auth__form" @submit.prevent="submit">
-          <EasyInput
-            v-model="form.username"
-            label="用户名"
-            placeholder="请输入用户名"
-            autocomplete="username"
-            :disabled="submitting"
-          />
-          <EasyInput
-            v-model="form.password"
-            label="密码"
-            type="password"
-            show-password
-            placeholder="请输入密码"
-            autocomplete="current-password"
-            :disabled="submitting"
-          />
+        <div class="auth__card">
+          <header class="auth__card-header">
+            <h1 class="auth__title">欢迎登录</h1>
+            <p class="auth__desc">使用你的 EasyOA 账号继续</p>
+          </header>
 
-          <EasyInput
-            v-if="totpRequired"
-            v-model="form.totpCode"
-            label="动态验证码"
-            placeholder="Authenticator 应用中的 6 位数字"
-            inputmode="numeric"
-            maxlength="6"
-            autocomplete="one-time-code"
-            :disabled="submitting"
-          />
+          <form class="auth__form" @submit.prevent="submit">
+            <EasyInput
+              v-model="form.username"
+              label="用户名"
+              placeholder="请输入用户名"
+              autocomplete="username"
+              :disabled="submitting"
+            />
+            <EasyInput
+              v-model="form.password"
+              label="密码"
+              type="password"
+              show-password
+              placeholder="请输入密码"
+              autocomplete="current-password"
+              :disabled="submitting"
+            />
 
-          <p v-if="formError" class="auth__error" role="alert">{{ formError }}</p>
+            <EasyInput
+              v-if="totpRequired"
+              v-model="form.totpCode"
+              label="动态验证码"
+              placeholder="Authenticator 应用中的 6 位数字"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              :disabled="submitting"
+            />
 
-          <EasyButton
-            variant="primary"
-            size="lg"
-            block
-            native-type="submit"
-            :loading="submitting"
-          >
-            登录
-          </EasyButton>
-        </form>
+            <p v-if="formError" class="auth__error" role="alert">{{ formError }}</p>
 
-        <p v-if="isDev" class="auth__dev-hint">
-          开发环境默认账号：<span class="easy-mono">root / admin / member</span>，初始密码见 README
-        </p>
+            <EasyButton
+              variant="primary"
+              size="lg"
+              block
+              native-type="submit"
+              :loading="submitting"
+            >
+              登录
+            </EasyButton>
+          </form>
+        </div>
       </div>
     </section>
   </div>
@@ -172,36 +177,60 @@ async function submit(): Promise<void> {
 <style scoped>
 .auth {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+  grid-template-columns: minmax(360px, 0.9fr) minmax(440px, 1.1fr);
   min-height: 100vh;
-  background: var(--easy-surface);
+  background: var(--easy-bg);
 }
 
+/* --- 左侧：品牌区（低对比度品牌背景 + 单一标语） --------------------------- */
 .auth__brand {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--easy-space-12) var(--easy-space-10);
   background: var(--easy-brand-subtle);
   border-right: 1px solid var(--easy-brand-subtle-border);
+  overflow: hidden;
 }
 
 .auth__brand-inner {
-  max-width: 420px;
+  position: relative;
+  z-index: 1;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
-  gap: var(--easy-space-5);
+  gap: var(--easy-space-6);
 }
 
-.auth__logo-row {
+/* 低干扰品牌装饰：极浅色块，不参与信息表达 */
+.auth__brand-ornament {
+  position: absolute;
+  right: -120px;
+  bottom: -140px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: var(--easy-green-100);
+  opacity: 0.55;
+}
+
+.auth__wordmark {
   display: flex;
   align-items: center;
   gap: var(--easy-space-3);
 }
 
 .auth__logo {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
+  flex: none;
+}
+
+.auth__wordmark-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
 }
 
 .auth__product {
@@ -215,63 +244,47 @@ async function submit(): Promise<void> {
   color: var(--easy-text-2);
 }
 
-.auth__headline {
-  font-size: 28px;
+.auth__tagline {
+  font-size: 26px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   letter-spacing: -0.02em;
   color: var(--easy-text-1);
 }
 
-.auth__subline {
-  color: var(--easy-text-2);
-  font-size: var(--easy-text-sm);
-  line-height: var(--easy-leading-relaxed);
-}
-
-.auth__features {
-  display: flex;
-  flex-direction: column;
-  gap: var(--easy-space-2);
-  font-size: var(--easy-text-sm);
-  color: var(--easy-text-2);
-}
-
-.auth__features li {
-  display: flex;
-  align-items: center;
-  gap: var(--easy-space-2);
-}
-
-.auth__features li::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: var(--easy-radius-full);
-  background: var(--easy-brand);
-  flex: none;
-}
-
-.auth__footnote {
-  font-size: var(--easy-text-xs);
-  color: var(--easy-text-3);
-}
-
+/* --- 右侧：登录表单 ------------------------------------------------------- */
 .auth__panel {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--easy-space-10) var(--easy-space-8);
-  background: var(--easy-bg);
+}
+
+.auth__panel-inner {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--easy-space-6);
+}
+
+.auth__compact-brand {
+  display: none;
+  align-items: center;
+  gap: var(--easy-space-2);
+}
+
+.auth__compact-brand .auth__logo {
+  width: 30px;
+  height: 30px;
 }
 
 .auth__card {
   width: 100%;
-  max-width: 380px;
   background: var(--easy-surface);
   border: 1px solid var(--easy-border);
   border-radius: var(--easy-radius-xl);
-  box-shadow: var(--easy-shadow-sm);
+  box-shadow: var(--easy-shadow-xs);
   padding: var(--easy-space-8);
 }
 
@@ -306,21 +319,44 @@ async function submit(): Promise<void> {
   font-size: var(--easy-text-xs);
 }
 
-.auth__dev-hint {
-  margin-top: var(--easy-space-5);
-  padding-top: var(--easy-space-4);
-  border-top: 1px dashed var(--easy-border-strong);
-  color: var(--easy-text-3);
-  font-size: var(--easy-text-xs);
+/* --- 响应式：平板收窄品牌栏，移动端单栏但保留品牌标识 --------------------- */
+@media (max-width: 1279px) {
+  .auth {
+    grid-template-columns: minmax(300px, 0.8fr) minmax(400px, 1.2fr);
+  }
+
+  .auth__brand {
+    padding: var(--easy-space-10) var(--easy-space-8);
+  }
+
+  .auth__tagline {
+    font-size: 22px;
+  }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 900px) {
   .auth {
     grid-template-columns: 1fr;
   }
 
   .auth__brand {
     display: none;
+  }
+
+  .auth__panel {
+    padding: var(--easy-space-8) var(--easy-space-5);
+  }
+
+  .auth__panel-inner {
+    max-width: 400px;
+  }
+
+  .auth__compact-brand {
+    display: flex;
+  }
+
+  .auth__card {
+    padding: var(--easy-space-6);
   }
 }
 </style>

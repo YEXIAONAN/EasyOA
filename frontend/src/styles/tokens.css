@@ -69,6 +69,9 @@
   --easy-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
   --easy-shadow-pop: 0 16px 48px rgba(16, 24, 40, 0.16);
 
+  /* 遮罩（命令面板 / 全屏浮层） */
+  --easy-overlay: rgba(15, 23, 42, 0.32);
+
   /* --- 字体 --------------------------------------------------------------- */
   --easy-font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Component } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   DataAnalysis,
   Document,
@@ -22,12 +23,14 @@ import { useUiStore } from '@/stores/ui'
  *
  * 设计约束（产品规范）：简洁、圆角、active 使用浅绿色背景、图标克制、
  * 不做巨大侧栏、不出现几十个二级菜单。
+ *
+ * 权限来源：菜单项只声明路由 name，可见性统一读取路由 meta（title / adminOnly），
+ * 避免在导航里重复定义路径、标题与权限映射（单一事实来源 = router）。
  */
 interface NavItem {
   name: string
   label: string
   icon: Component
-  adminOnly?: boolean
 }
 
 interface NavGroup {
@@ -37,6 +40,7 @@ interface NavGroup {
 
 const auth = useAuthStore()
 const ui = useUiStore()
+const router = useRouter()
 
 const groups: NavGroup[] = [
   {
@@ -63,18 +67,26 @@ const groups: NavGroup[] = [
     label: '系统',
     items: [
       { name: 'security', label: '安全中心', icon: Lock },
-      { name: 'audit-logs', label: '审计日志', icon: Document, adminOnly: true },
-      { name: 'settings', label: '系统设置', icon: Setting, adminOnly: true },
+      { name: 'audit-logs', label: '审计日志', icon: Document },
+      { name: 'settings', label: '系统设置', icon: Setting },
     ],
   },
 ]
 
-/** 无权限的导航项不渲染（仅体验层面，真实权限由后端判定） */
+/** 路由 meta 声明的管理员专属页面 */
+function requiresAdmin(name: string): boolean {
+  return router.resolve({ name }).meta.adminOnly === true
+}
+
+/**
+ * 无权限的导航项不渲染（仅体验层面，真实权限由后端判定；
+ * 路由守卫亦会拦截直接访问）。
+ */
 const visibleGroups = computed(() =>
   groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.adminOnly || auth.isAdminLike),
+      items: group.items.filter((item) => !requiresAdmin(item.name) || auth.isAdminLike),
     }))
     .filter((group) => group.items.length > 0),
 )

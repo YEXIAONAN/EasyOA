@@ -28,8 +28,14 @@ export const authApi = {
     return apiRequest({ url: '/auth/logout', method: 'post' })
   },
 
-  me(): Promise<CurrentUser> {
-    return apiRequest({ url: '/auth/me', method: 'get' })
+  /**
+   * 当前登录用户。
+   *
+   * @param silent401 启动时的登录态探测传 true：401 属预期结果，
+   *   不应触发全局跳转登录页（避免与路由守卫的 redirect 竞争）。
+   */
+  me(silent401 = false): Promise<CurrentUser> {
+    return apiRequest({ url: '/auth/me', method: 'get', silent401 })
   },
 
   changePassword(payload: ChangePasswordPayload): Promise<void> {

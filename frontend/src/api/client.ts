@@ -29,6 +29,18 @@ export function onUnauthenticated(handler: UnauthorizedHandler): void {
   unauthorizedHandler = handler
 }
 
+/**
+ * 请求配置扩展。
+ *
+ * {@code silent401}：本次请求的 401 属于「预期内」的探测（例如启动时判断是否已登录），
+ * 不应触发全局跳转登录页——否则会与路由守卫的 redirect 竞争，导致丢失目标地址。
+ */
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    silent401?: boolean
+  }
+}
+
 export const http: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE ?? '/api',
   timeout: 20000,
@@ -61,7 +73,7 @@ http.interceptors.response.use(
       },
     )
 
-    if (apiError.isUnauthenticated) {
+    if (apiError.isUnauthenticated && !error.config?.silent401) {
       unauthorizedHandler?.()
     }
     throw apiError

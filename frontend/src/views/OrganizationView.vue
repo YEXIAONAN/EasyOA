@@ -395,7 +395,7 @@ async function setPrimary(member: OrgMember): Promise<void> {
           <span>显示已归档</span>
         </label>
         <EasyButton v-if="canManageStructure" variant="primary" @click="openCreateUnit(null)">
-          <el-icon style="margin-right: 4px"><Plus /></el-icon>
+          <el-icon class="easy-icon-lead"><Plus /></el-icon>
           新建部门 / 团队
         </EasyButton>
       </div>

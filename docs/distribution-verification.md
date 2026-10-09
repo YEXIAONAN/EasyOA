@@ -82,6 +82,8 @@ Tag 模式、版本一致性、Workflow 语法和依赖门禁已在本地检查�
 主套件的跳过原因是默认运行环境未将临时 PowerShell 放入 PATH，且真实 Docker 代理测试需要显式启用；补测均完成。
 原生 Windows 的真实生产服务启动：**NOT VERIFIED**。PowerShell 解析 / 密码保留 / 原生签名检查在 macOS PowerShell 7.4.13 完成，不能等同于 Windows Docker 实测。
 
+后续 Windows CI 兼容修复：原提交的 Windows 脚本检查失败，本地以 Windows 常用 cp1252 默认编码复现了含中文 Workflow 的读取异常。测试文件、配置和子进程输出现在显式使用 UTF-8，版本同步保留 UTF-8 / LF，CI 设置 `PYTHONUTF8=1`。新增中文版本配置在非 UTF-8 默认编码下的回归用例；本地新套件 29 项，26 通过、3 跳过（当前环境无可用 PowerShell，真实代理测试需显式启用），模拟 cp1252 的 4 项版本 / Workflow 检查全部通过。真实 Windows 回归结果以本次修复提交的 GitHub CI 为准，未删除 Windows 门禁。
+
 本地日志和测试产物位于 Git 忽略的 `.ai-local/distribution-validation/`，最终资产在 `release-validated/assets/`。测试容器、卷和进程已清理，用户原有开发数据库保持运行。
 
 ## Manual Configuration Required

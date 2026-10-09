@@ -16,27 +16,27 @@ def validate(value):
     return value
 
 def check(root=ROOT, tag=None):
-    version = validate((root/'VERSION').read_text().strip())
+    version = validate((root/'VERSION').read_text(encoding='utf-8').strip())
     if tag is not None and tag != 'v'+version:
         raise ValueError(f'Tag {tag} does not match VERSION {version}.')
     ns = {'m':'http://maven.apache.org/POM/4.0.0'}
     backend = ET.parse(root/'backend/pom.xml').getroot().find('m:version',ns).text
-    frontend = json.loads((root/'frontend/package.json').read_text())['version']
-    lock = json.loads((root/'frontend/package-lock.json').read_text())
+    frontend = json.loads((root/'frontend/package.json').read_text(encoding='utf-8'))['version']
+    lock = json.loads((root/'frontend/package-lock.json').read_text(encoding='utf-8'))
     for name,value in [('backend',backend),('frontend',frontend),('lockfile',lock['version']),('lockfile root',lock['packages']['']['version'])]:
         if value != version: raise ValueError(f'{name} version {value} differs from VERSION {version}. Run scripts/release/version.py --sync.')
     return version
 
 def sync(root=ROOT):
-    version = validate((root/'VERSION').read_text().strip())
+    version = validate((root/'VERSION').read_text(encoding='utf-8').strip())
     pom = root/'backend/pom.xml'
-    text,count = re.subn(r'(<artifactId>easyoa-api</artifactId>\s*<version>)[^<]+',lambda m:m[1]+version,pom.read_text(),count=1)
+    text,count = re.subn(r'(<artifactId>easyoa-api</artifactId>\s*<version>)[^<]+',lambda m:m[1]+version,pom.read_text(encoding='utf-8'),count=1)
     if count!=1: raise ValueError('Cannot locate backend project version')
-    pom.write_text(text)
+    pom.write_text(text,encoding='utf-8',newline='\n')
     for name in ['package.json','package-lock.json']:
-        path=root/'frontend'/name; data=json.loads(path.read_text()); data['version']=version
+        path=root/'frontend'/name; data=json.loads(path.read_text(encoding='utf-8')); data['version']=version
         if name=='package-lock.json': data['packages']['']['version']=version
-        path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+        path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
     return check(root)
 
 if __name__=='__main__':

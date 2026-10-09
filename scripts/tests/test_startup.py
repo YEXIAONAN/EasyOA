@@ -64,7 +64,7 @@ elif a and a[0]=='create':print('synthetic-container')
 elif a and a[0]=='cp':
  p=Path(a[-1])
  if '/app/app.jar' in a[-2]:
-  root=p.parent.parent;version='0.1.1' if os.environ.get('TEST_STALE_IMAGE') else (root/'VERSION').read_text().strip()
+  root=p.parent.parent;version='0.1.1' if os.environ.get('TEST_STALE_IMAGE') else (root/'VERSION').read_text(encoding='utf-8').strip()
   der=subprocess.check_output(['openssl','pkey','-pubin','-in',str(root/'integrity/release-public-key.pem'),'-outform','DER'])
   props='version='+version+'\\nrelease-key-fingerprint='+hashlib.sha256(der).hexdigest()+'\\nsource-ref=v'+version+'\\n'
   with zipfile.ZipFile(p,'w') as jar:jar.writestr('BOOT-INF/classes/easyoa-build.properties',props)
@@ -81,22 +81,22 @@ from pathlib import Path
 if os.environ.get('TEST_DEV') and not (Path(os.environ['TEST_ROOT'])/'api-ready').exists():sys.exit(1)
 if any('/api/system/about' in a for a in sys.argv):
  import json
- print(json.dumps({'data':{'version':os.environ.get('TEST_API_VERSION') or (Path(os.environ['TEST_ROOT'])/'VERSION').read_text().strip(),'signatureVerified':not bool(os.environ.get('TEST_API_UNVERIFIED'))}},separators=(',',':')))
+ print(json.dumps({'data':{'version':os.environ.get('TEST_API_VERSION') or (Path(os.environ['TEST_ROOT'])/'VERSION').read_text(encoding='utf-8').strip(),'signatureVerified':not bool(os.environ.get('TEST_API_UNVERIFIED'))}},separators=(',',':')))
 """)
         self.tool('sleep','import time;time.sleep(0.01)\n')
 
     def tool(self,name,body):
-        path=self.bin/name;path.write_text('#!'+str(Path(shutil.which('python3')).resolve())+'\n'+body);path.chmod(0o755);return path
+        path=self.bin/name;path.write_text('#!'+str(Path(shutil.which('python3')).resolve())+'\n'+body,encoding='utf-8',newline='\n');path.chmod(0o755);return path
     def invoke(self,args,timeout=60):
-        return subprocess.run(args,cwd=self.base,env=self.env,text=True,capture_output=True,timeout=timeout)
+        return subprocess.run(args,cwd=self.base,env=self.env,text=True,encoding='utf-8',capture_output=True,timeout=timeout)
     def cli(self,*args):return self.invoke([BASH,str(self.root/'easyoactl'),*args])
-    def commands(self):return [json.loads(line) for line in self.events.read_text().splitlines()] if self.events.exists() else []
+    def commands(self):return [json.loads(line) for line in self.events.read_text(encoding='utf-8').splitlines()] if self.events.exists() else []
     def tls(self):
         directory=self.root/'infra/nginx/certs';directory.mkdir(parents=True,exist_ok=True)
-        for name in ['easyoa.crt','easyoa.key']:(directory/name).write_text('synthetic TLS fixture\n')
+        for name in ['easyoa.crt','easyoa.key']:(directory/name).write_text('synthetic TLS fixture\n',encoding='utf-8',newline='\n')
     def valid_env(self):
-        value=(self.root/'.env.example').read_text().replace('CHANGE_ME_STRONG_DB_PASSWORD','synthetic-database-password-2026').replace('CHANGE_ME_AT_LEAST_32_CHARS_RANDOM_SECRET','synthetic-session-secret-for-local-tests-only-2026')
-        (self.root/'.env').write_text(value);self.tls();return value
+        value=(self.root/'.env.example').read_text(encoding='utf-8').replace('CHANGE_ME_STRONG_DB_PASSWORD','synthetic-database-password-2026').replace('CHANGE_ME_AT_LEAST_32_CHARS_RANDOM_SECRET','synthetic-session-secret-for-local-tests-only-2026')
+        (self.root/'.env').write_text(value,encoding='utf-8',newline='\n');self.tls();return value
     def keypair(self):
         private=self.base/'temporary-private.pem';public=self.base/'public.pem'
         r=self.invoke([SSL,'genpkey','-algorithm','ed25519','-out',str(private)])
@@ -108,7 +108,7 @@ if any('/api/system/about' in a for a in sys.argv):
         r=self.invoke([BASH,str(self.root/'scripts/integrity/package-release.sh'),'--version','v0.2.0','--output',str(output),'--signing-key',str(private),'--public-key',str(public)])
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertFalse((output/'.env').exists());self.assertFalse((output/'infra/nginx/certs/easyoa.key').exists())
-        self.assertNotIn('build:',(output/'docker-compose.yml').read_text())
+        self.assertNotIn('build:',(output/'docker-compose.yml').read_text(encoding='utf-8'))
         self.root=output;self.env['TEST_ROOT']=str(output);self.events.unlink();return private,public
 
     @unittest.skipUnless(BASH,'requires Bash')
@@ -128,7 +128,7 @@ if any('/api/system/about' in a for a in sys.argv):
         self.env.update(TEST_PIN_ENV='1',POSTGRES_PASSWORD='ambient-incorrect-password',EASYOA_PROFILE='dev')
         for command in ['install','start']:
             r=self.cli(command);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
-        self.assertEqual((self.root/'.env').read_text(),original)
+        self.assertEqual((self.root/'.env').read_text(encoding='utf-8'),original)
         self.assertEqual(sum('load' in a for a in self.commands()),2)
         self.assertTrue(all('--no-build' in a and '--pull' in a and 'never' in a for a in self.commands() if 'up' in a))
         self.assertNotIn('synthetic-database-password',r.stdout+r.stderr)
@@ -143,16 +143,16 @@ if any('/api/system/about' in a for a in sys.argv):
     @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
     def test_fresh_install_generates_secrets_with_seed_disabled(self):
         self.signed_bundle();self.tls();r=self.cli('install');self.assertEqual(r.returncode,0,r.stdout+r.stderr)
-        values=dict(line.split('=',1) for line in (self.root/'.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+        values=dict(line.split('=',1) for line in (self.root/'.env').read_text(encoding='utf-8').splitlines() if '=' in line and not line.startswith('#'))
         self.assertGreaterEqual(len(values['EASYOA_SESSION_SECRET']),32);self.assertNotIn('CHANGE_ME',values['POSTGRES_PASSWORD'])
         self.assertEqual(values['EASYOA_DEV_SEED'],'false');self.assertNotIn(values['EASYOA_SESSION_SECRET'],r.stdout+r.stderr)
 
     @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
     def test_unsafe_configuration_and_unhealthy_services_fail(self):
         self.signed_bundle();original=self.valid_env()
-        for value in [original.replace('EASYOA_DEV_SEED=false','EASYOA_DEV_SEED=true'),(self.root/'.env.example').read_text()]:
-            (self.root/'.env').write_text(value);r=self.cli('start');self.assertNotEqual(r.returncode,0);self.assertFalse(any('up' in a for a in self.commands()))
-        (self.root/'.env').write_text(original)
+        for value in [original.replace('EASYOA_DEV_SEED=false','EASYOA_DEV_SEED=true'),(self.root/'.env.example').read_text(encoding='utf-8')]:
+            (self.root/'.env').write_text(value,encoding='utf-8',newline='\n');r=self.cli('start');self.assertNotEqual(r.returncode,0);self.assertFalse(any('up' in a for a in self.commands()))
+        (self.root/'.env').write_text(original,encoding='utf-8',newline='\n')
         for failure in ['TEST_DAEMON_FAIL','TEST_COMPOSE_FAIL','TEST_UNHEALTHY','TEST_API_UNVERIFIED']:
             self.env[failure]='1';r=self.cli('start');self.assertNotEqual(r.returncode,0,r.stdout+r.stderr);self.env.pop(failure)
 
@@ -167,7 +167,7 @@ if any('/api/system/about' in a for a in sys.argv):
                 self.assertNotEqual(r.returncode,0);path.write_bytes(original)
         for name in ['integrity/manifest.sig','backend/app.jar']:
             path=self.root/name;original=path.read_bytes();path.unlink();r=self.cli('start');self.assertNotEqual(r.returncode,0);path.write_bytes(original)
-        extra=self.root/'infra/nginx/conf.d/extra.conf';extra.write_text('# unsigned\n');r=self.cli('start');self.assertNotEqual(r.returncode,0);extra.unlink()
+        extra=self.root/'infra/nginx/conf.d/extra.conf';extra.write_text('# unsigned\n',encoding='utf-8',newline='\n');r=self.cli('start');self.assertNotEqual(r.returncode,0);extra.unlink()
         self.assertFalse(any('up' in a for a in self.commands()))
         if PWSH:
             r=self.invoke([PWSH,'-NoProfile','-File',str(self.root/'scripts/integrity/verify-integrity.ps1'),'-Root',str(self.root)])
@@ -192,7 +192,7 @@ if any('/api/system/about' in a for a in sys.argv):
     def test_upgrade_validates_before_backup_and_preserves_old_deployment(self):
         private,_=self.signed_bundle();original=self.valid_env();target=self.base/'new release'
         shutil.copytree(self.root,target,ignore=shutil.ignore_patterns('.env','backups','certs'))
-        (target/'VERSION').write_text('0.2.1\n')
+        (target/'VERSION').write_text('0.2.1\n',encoding='utf-8',newline='\n')
         r=self.cli('upgrade',str(target));self.assertNotEqual(r.returncode,0)
         self.assertFalse((self.root/'backups').exists());self.assertFalse((target/'.env').exists())
         r=self.invoke([BASH,str(target/'scripts/integrity/generate-manifest.sh'),'--root',str(target)])
@@ -200,7 +200,7 @@ if any('/api/system/about' in a for a in sys.argv):
         r=self.invoke([SSL,'pkeyutl','-sign','-inkey',str(private),'-rawin','-in',str(target/'integrity/manifest.sha256'),'-out',str(target/'integrity/manifest.sig')]);self.assertEqual(r.returncode,0,r.stderr)
         self.env['TEST_API_VERSION']='0.2.1'
         r=self.cli('upgrade',str(target));self.assertEqual(r.returncode,0,r.stdout+r.stderr)
-        self.assertEqual((self.root/'.env').read_text(),original);self.assertEqual((target/'.env').read_text(),original)
+        self.assertEqual((self.root/'.env').read_text(encoding='utf-8'),original);self.assertEqual((target/'.env').read_text(encoding='utf-8'),original)
         self.assertTrue((target/'infra/nginx/certs/easyoa.key').exists());self.assertTrue((self.root/'backups').exists())
         self.assertFalse(any('down' in a for a in self.commands()))
 
@@ -214,7 +214,7 @@ root=Path(os.environ['TEST_ROOT']);(root/'api-ready').touch();(root/('pid-'+str(
 signal.signal(signal.SIGTERM,lambda *_:exit(0))
 while True:time.sleep(0.1)
 """
-        mvnw=self.root/'backend/mvnw';mvnw.write_text('#!'+str(Path(shutil.which('python3')).resolve())+'\n'+body);mvnw.chmod(0o755);self.tool('npm',body)
+        mvnw=self.root/'backend/mvnw';mvnw.write_text('#!'+str(Path(shutil.which('python3')).resolve())+'\n'+body,encoding='utf-8',newline='\n');mvnw.chmod(0o755);self.tool('npm',body)
         with socket.socket() as api,socket.socket() as web:
             api.bind(('127.0.0.1',0));web.bind(('127.0.0.1',0));ports=(api.getsockname()[1],web.getsockname()[1])
         self.env.update(TEST_DEV='1',EASYOA_API_PORT=str(ports[0]),EASYOA_DEV_WEB_PORT=str(ports[1]))
@@ -223,12 +223,12 @@ while True:time.sleep(0.1)
             proc=subprocess.Popen([BASH,str(self.root/'easyoactl'),'dev'],cwd=self.base,env=self.env,stdout=f,stderr=f,start_new_session=True)
             try:
                 for _ in range(150):
-                    if len(list(self.root.glob('pid-*')))==2 and 'development is ready' in log.read_text():break
-                    if proc.poll() is not None:self.fail(log.read_text())
+                    if len(list(self.root.glob('pid-*')))==2 and 'development is ready' in log.read_text(encoding='utf-8'):break
+                    if proc.poll() is not None:self.fail(log.read_text(encoding='utf-8'))
                     time.sleep(0.1)
-                self.assertEqual(len(list(self.root.glob('pid-*'))),2,log.read_text());proc.send_signal(signal.SIGTERM);proc.wait(timeout=10)
+                self.assertEqual(len(list(self.root.glob('pid-*'))),2,log.read_text(encoding='utf-8'));proc.send_signal(signal.SIGTERM);proc.wait(timeout=10)
                 for marker in self.root.glob('pid-*'):
-                    with self.assertRaises(ProcessLookupError):os.kill(int(marker.read_text()),0)
+                    with self.assertRaises(ProcessLookupError):os.kill(int(marker.read_text(encoding='utf-8')),0)
                 self.assertFalse(any('down' in a for a in self.commands()))
             finally:
                 if proc.poll() is None:os.killpg(proc.pid,signal.SIGKILL);proc.wait()
@@ -238,13 +238,13 @@ while True:time.sleep(0.1)
         r=self.invoke([PWSH,'-NoProfile','-File',str(self.root/'easyoactl.ps1')]);self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertFalse((self.root/'.env').exists());original=self.valid_env()
         r=self.invoke([PWSH,'-NoProfile','-Command',f". '{self.root}/scripts/bootstrap/common.ps1'; . '{self.root}/scripts/bootstrap/deploy-env.ps1'; Ensure-EnvFile '{self.root}'; Validate-EnvProd '{self.root}'"])
-        self.assertEqual(r.returncode,0,r.stdout+r.stderr);self.assertEqual((self.root/'.env').read_text(),original)
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr);self.assertEqual((self.root/'.env').read_text(encoding='utf-8'),original)
 
     @unittest.skipUnless(PWSH and SSL,'PowerShell/OpenSSL unavailable')
     def test_native_powershell_signature_without_bash(self):
         private,public=self.keypair();shutil.copy2(public,self.root/'integrity/release-public-key.pem')
-        (self.root/'backend/app.jar').write_bytes(b'synthetic jar');(self.root/'frontend/dist').mkdir();(self.root/'frontend/dist/index.html').write_text('synthetic web');(self.root/'release-images.tar.gz').write_bytes(b'images')
-        paths=[line for line in (self.root/'scripts/integrity/protected-files.txt').read_text().splitlines() if line and not line.startswith('#')]
+        (self.root/'backend/app.jar').write_bytes(b'synthetic jar');(self.root/'frontend/dist').mkdir();(self.root/'frontend/dist/index.html').write_text('synthetic web',encoding='utf-8',newline='\n');(self.root/'release-images.tar.gz').write_bytes(b'images')
+        paths=[line for line in (self.root/'scripts/integrity/protected-files.txt').read_text(encoding='utf-8').splitlines() if line and not line.startswith('#')]
         paths+=['integrity/README.md']
         manifest=self.root/'integrity/manifest.sha256';manifest.write_bytes(''.join(hashlib.sha256((self.root/p).read_bytes()).hexdigest()+'  '+p+'\n' for p in sorted(set(paths))).encode())
         r=self.invoke([SSL,'pkeyutl','-sign','-inkey',str(private),'-rawin','-in',str(manifest),'-out',str(self.root/'integrity/manifest.sig')]);self.assertEqual(r.returncode,0,r.stderr)

@@ -46,10 +46,28 @@ class VersionTests(unittest.TestCase):
         for v in ['v0.2.0','0.2','01.2.0','0.2.0-beta.01','0.2.0-','0.2.0;whoami']:
             with self.assertRaises(ValueError):version.validate(v)
     def test_workflow_is_tag_only_and_ci_gates_publication(self):
-        release=(SOURCE/'.github/workflows/release.yml').read_text();ci=(SOURCE/'.github/workflows/ci.yml').read_text()
+        release=(SOURCE/'.github/workflows/release.yml').read_text(encoding='utf-8');ci=(SOURCE/'.github/workflows/ci.yml').read_text(encoding='utf-8')
         self.assertIn("- 'v*.*.*'",release);self.assertIn('needs: [validate, ci]',release)
         self.assertIn('secrets.EASYOA_RELEASE_SIGNING_KEY',release);self.assertIn('contents: write',release)
         self.assertNotIn('continue-on-error',release);self.assertNotIn('tags:',ci);self.assertIn('workflow_call:',ci)
+
+    def test_version_sync_preserves_utf8_under_windows_default_encoding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'backend').mkdir();(root/'frontend').mkdir()
+            (root/'VERSION').write_bytes(b'0.2.0\n')
+            (root/'backend/pom.xml').write_bytes('<project xmlns="http://maven.apache.org/POM/4.0.0"><!-- 构建配置 --><artifactId>easyoa-api</artifactId><version>0.1.1</version></project>'.encode('utf-8'))
+            for name in ['package.json','package-lock.json']:
+                value={'name':'示例项目','version':'0.1.1','packages':{'':{'version':'0.1.1'}}}
+                (root/'frontend'/name).write_bytes(json.dumps(value,ensure_ascii=False).encode('utf-8'))
+            original=Path.open
+            def windows_default(path,mode='r',buffering=-1,encoding=None,errors=None,newline=None):
+                if 'b' not in mode and encoding in (None,'locale'):encoding='cp1252'
+                return original(path,mode,buffering,encoding,errors,newline)
+            with patch.object(Path,'open',windows_default):
+                self.assertEqual(version.sync(root),'0.2.0')
+                self.assertEqual(version.check(root,'v0.2.0'),'0.2.0')
+            self.assertIn('构建配置',(root/'backend/pom.xml').read_bytes().decode('utf-8'))
+            self.assertEqual(json.loads((root/'frontend/package.json').read_bytes())['name'],'示例项目')
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
@@ -82,7 +100,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual((destination/'root/safe.txt').read_bytes(),b'x')
 
     def test_portable_release_archive_has_only_payload_and_is_installable(self):
-        source=self.root/'EasyOA-v0.2.0';source.mkdir();payload=source/'VERSION';payload.write_text('0.2.0\n')
+        source=self.root/'EasyOA-v0.2.0';source.mkdir();payload=source/'VERSION';payload.write_text('0.2.0\n',encoding='utf-8',newline='\n')
         if hasattr(os,'setxattr'):
             try:os.setxattr(payload,'user.easyoa-validation',b'local metadata')
             except OSError:pass
@@ -91,7 +109,7 @@ class ArchiveTests(unittest.TestCase):
             self.assertEqual(tar.getnames(),['EasyOA-v0.2.0','EasyOA-v0.2.0/VERSION'])
             self.assertTrue(all(m.uid==0 and m.gid==0 for m in tar))
         archive.extract(path,self.root/'installed',source.name)
-        self.assertEqual((self.root/'installed'/source.name/'VERSION').read_text(),'0.2.0\n')
+        self.assertEqual((self.root/'installed'/source.name/'VERSION').read_text(encoding='utf-8'),'0.2.0\n')
 
 @unittest.skipUnless(SSL,'OpenSSL unavailable')
 class ReleaseTests(unittest.TestCase):
@@ -108,8 +126,8 @@ class ReleaseTests(unittest.TestCase):
         for p in self.assets.iterdir():
             if p.name!='release-public-key.pem':p.unlink()
         name='EasyOA-'+tag+'.tar.gz';(self.assets/name).write_bytes(b'synthetic archive')
-        (self.assets/(name+'.sha256')).write_text(__import__('hashlib').sha256(b'synthetic archive').hexdigest()+'  '+name+'\n')
-        (self.assets/'manifest.sha256').write_text('synthetic manifest\n')
+        (self.assets/(name+'.sha256')).write_text(__import__('hashlib').sha256(b'synthetic archive').hexdigest()+'  '+name+'\n',encoding='utf-8',newline='\n')
+        (self.assets/'manifest.sha256').write_text('synthetic manifest\n',encoding='utf-8',newline='\n')
         for data,sig in [(name+'.sha256',name+'.sha256.sig'),('manifest.sha256','manifest.sig')]:
             self.ssl('pkeyutl','-sign','-inkey',self.private,'-rawin','-in',self.assets/data,'-out',self.assets/sig)
     def test_valid_assets_and_normal_release_publish_only_after_all_uploads(self):
@@ -144,11 +162,11 @@ class ReleaseTests(unittest.TestCase):
     @unittest.skipUnless(BASH,'requires Bash')
     def test_quick_installer_checks_signature_before_extracting_or_executing(self):
         binary=self.root/'bin';binary.mkdir();curl=binary/'curl'
-        curl.write_text('#!'+sys.executable+'\nimport os,sys,shutil\nfrom pathlib import Path\na=sys.argv[1:];shutil.copy2(Path(os.environ["TEST_ASSETS"])/a[-3].rsplit("/",1)[-1],a[-1])\n');curl.chmod(0o755)
+        curl.write_text('#!'+sys.executable+'\nimport os,sys,shutil\nfrom pathlib import Path\na=sys.argv[1:];shutil.copy2(Path(os.environ["TEST_ASSETS"])/a[-3].rsplit("/",1)[-1],a[-1])\n',encoding='utf-8',newline='\n');curl.chmod(0o755)
         env=os.environ.copy();env.update(PATH=str(binary)+os.pathsep+env['PATH'],TEST_ASSETS=str(self.assets))
         for asset in ['manifest.sig','EasyOA-v0.2.0.tar.gz.sha256.sig','EasyOA-v0.2.0.tar.gz']:
             self.make_assets('v0.2.0');(self.assets/asset).write_bytes(b'tampered');destination=self.root/'install'
-            r=subprocess.run([BASH,str(SOURCE/'scripts/quick_start.sh'),'--tag','v0.2.0','--public-key',str(self.assets/'release-public-key.pem'),'--destination',str(destination)],env=env,text=True,capture_output=True)
+            r=subprocess.run([BASH,str(SOURCE/'scripts/quick_start.sh'),'--tag','v0.2.0','--public-key',str(self.assets/'release-public-key.pem'),'--destination',str(destination)],env=env,text=True,encoding='utf-8',capture_output=True)
             self.assertNotEqual(r.returncode,0);self.assertFalse(destination.exists());self.assertNotIn('Archive safety checks passed',r.stdout)
 
 if __name__=='__main__':unittest.main()

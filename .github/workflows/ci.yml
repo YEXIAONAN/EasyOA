@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Startup and integrity regression tests
+        env:
+          PYTHONUTF8: '1'
         run: python -m unittest discover -s scripts/tests -v
       - name: Parse PowerShell scripts
         shell: pwsh

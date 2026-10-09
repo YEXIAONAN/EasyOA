@@ -1,6 +1,6 @@
 {
   "name": "easyoa-web",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "EasyOA — 面向学生团队 / 小公司 / 工作室的私有化协同办公系统前端",
   "type": "module",
@@ -30,5 +30,6 @@
     "typescript": "~5.7.2",
     "vite": "^6.0.5",
     "vue-tsc": "^2.2.0"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+source "$ROOT/scripts/bootstrap/common.sh"
+source "$ROOT/scripts/bootstrap/deploy-env.sh"
+source "$ROOT/scripts/bootstrap/production.sh"
+source "$ROOT/scripts/bootstrap/dev.sh"
+source "$ROOT/scripts/bootstrap/maintenance.sh"
+compose() (
+  # Every operation uses the deployment file, including backup and restore.
+  local key value
+  for key in POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD EASYOA_SESSION_SECRET EASYOA_BASE_URL EASYOA_HTTP_PORT EASYOA_HTTPS_PORT EASYOA_TLS_CERT_DIR EASYOA_SOURCE_URL EASYOA_SESSION_TIMEOUT_MINUTES EASYOA_LOGIN_MAX_FAILURES EASYOA_LOGIN_LOCK_MINUTES EASYOA_STORAGE_PATH; do
+    value="$(env_get "$ROOT" "$key" || true)"
+    if [ -n "$value" ]; then export "$key=$value"; else unset "$key"; fi
+  done
+  export EASYOA_PROFILE=prod
+  docker compose --project-directory "$ROOT" --env-file "$ROOT/.env" -f "$ROOT/docker-compose.yml" "$@"
+)
+ALLOW_SELF_SIGNED=0
+DATABASE_ONLY=0
+
+usage() {
+  cat <<'HELP'
+EasyOA Community Edition
+
+Usage: ./easyoactl COMMAND [OPTIONS]
+
+Installation:
+  install                 Initialize and start a signed deployment
+  upgrade RELEASE_DIR     Back up and use a newer verified release directory
+
+Service:
+  start                   Verify and start services
+  stop                    Stop services; preserve data
+  restart                 Verify and restart services
+  status                  Show version, verification, containers and access URL
+
+Maintenance:
+  logs [-f] [SERVICE]      Show the last 200 log lines
+  doctor                  Diagnose dependencies, configuration and service health
+  backup                  Pause API briefly; back up database, files and configuration
+  restore BACKUP [--yes]   Validate, confirm and restore; take a safety backup first
+  verify                  Verify the official signature and protected files
+
+Development:
+  dev [--database-only]   Start the local development environment (JDK 21 / Node 22.12+)
+
+Information:
+  version                 Show the version from VERSION
+  help                    Show this help
+
+install/start/restart accept --self-signed-tls for local testing only.
+Windows uses easyoactl.ps1 for service and development commands.
+HELP
+}
+
+COMMAND="${1:-help}"
+[ $# -eq 0 ] || shift
+case "$COMMAND" in
+  help|-h|--help) [ $# -eq 0 ] || DIE 'Unexpected help arguments.'; usage ;;
+  version) [ $# -eq 0 ] || DIE 'Unexpected version arguments.'; printf 'EasyOA Community Edition v%s\n' "$(resolve_version)" ;;
+  verify) [ $# -eq 0 ] || DIE 'Unexpected verify arguments.'; run_integrity_gate ;;
+  install|start|restart)
+    if [ "${1:-}" = --self-signed-tls ]; then ALLOW_SELF_SIGNED=1; shift; fi
+    [ $# -eq 0 ] || DIE 'Unknown deployment option.'
+    if [ "$COMMAND" = restart ]; then run_integrity_gate; check_docker_environment; compose stop; fi
+    run_production ;;
+  dev)
+    if [ "${1:-}" = --database-only ]; then DATABASE_ONLY=1; shift; fi
+    [ $# -eq 0 ] || DIE 'Unknown development option.'
+    printf 'EasyOA DEVELOPMENT MODE\nOfficial release integrity enforcement is disabled.\nThis mode must not be used as a production deployment.\n' >&2
+    run_dev ;;
+  stop) [ $# -eq 0 ] || DIE 'Unexpected stop arguments.'; check_docker_environment; compose stop; SUCCESS 'Services stopped. Database and uploaded files are preserved.' ;;
+  status) [ $# -eq 0 ] || DIE 'Unexpected status arguments.'; show_status ;;
+  logs) show_logs "$@" ;;
+  doctor) [ $# -eq 0 ] || DIE 'Unexpected doctor arguments.'; run_doctor ;;
+  backup) [ $# -eq 0 ] || DIE 'Unexpected backup arguments.'; run_backup ;;
+  restore) run_restore "$@" ;;
+  upgrade) run_upgrade "$@" ;;
+  *) ERROR "Unknown command: $COMMAND"; usage; exit 2 ;;
+esac

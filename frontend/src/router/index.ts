@@ -13,6 +13,12 @@ import { useAuthStore } from '@/stores/auth'
  */
 const routes: RouteRecordRaw[] = [
   {
+    path: '/about',
+    name: 'about',
+    component: () => import('@/views/AboutView.vue'),
+    meta: { public: true, title: '关于 EasyOA' },
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
@@ -130,6 +136,8 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  // Source/license information remains reachable before setup and without a session.
+  if (to.name === 'about') return true
   const auth = useAuthStore()
   await auth.bootstrap()
 

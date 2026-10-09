@@ -16,7 +16,11 @@ COPY mvnw ./
 RUN ./mvnw -B -q -DskipTests dependency:go-offline
 
 COPY src ./src
+ARG RELEASE_KEY_FINGERPRINT=""
+ARG SOURCE_REF=""
 RUN ./mvnw -B -q -DskipTests package \
+    "-Deasyoa.release.key.fingerprint=$RELEASE_KEY_FINGERPRINT" \
+    "-Deasyoa.source.ref=$SOURCE_REF" \
     && cp target/easyoa-api-*.jar /build/app.jar
 
 FROM eclipse-temurin:21-jre

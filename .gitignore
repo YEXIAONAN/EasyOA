@@ -11,6 +11,11 @@
 *.crt
 !infra/nginx/certs/.gitkeep
 
+# Release integrity: public key is committable; manifest/signature are release artifacts
+!integrity/release-public-key.pem
+integrity/manifest.sha256
+integrity/manifest.sig
+
 # Backend — Java / Maven
 backend/target/
 *.class
@@ -60,7 +65,7 @@ backend/logs/
 infra/data/
 
 # Build/release artifacts
-release/
+/release/
 *.tar.gz
 *.zip
 
@@ -77,5 +82,13 @@ release/
 .ai-local/
 .agent-cache/
 
-AGENTS.md
-EasyOAAgent.md
+
+# Deployment backups and downloaded releases
+backups/
+.download-cache/
+*.private.pem
+release-signing-key*
+
+# Python tooling caches
+__pycache__/
+*.pyc

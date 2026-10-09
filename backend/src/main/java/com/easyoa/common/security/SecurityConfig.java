@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
+                        // Public software/license identity contains no deployment secrets.
+                        .requestMatchers(HttpMethod.GET, "/api/system/about").permitAll()
                         // 首次初始化（受原子开关保护，完成后自动失效）
                         .requestMatchers(HttpMethod.GET, "/api/setup/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/setup/initialize").permitAll()

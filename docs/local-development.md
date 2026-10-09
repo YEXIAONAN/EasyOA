@@ -8,21 +8,61 @@
 | ---- | ---- | ---- |
 | JDK | 21 | 后端编译与运行 |
 | Maven | 3.9+ | 或直接使用仓库自带的 `./mvnw`（推荐） |
-| Node.js | 20.19+ | 前端构建（Vite 6 要求） |
+| Node.js | 22.12+ | 前端构建（现有 VueUse 依赖与构建要求） |
 | Docker + Compose | v2 | 本地 PostgreSQL 与集成测试（Testcontainers） |
 
 > 集成测试使用 Testcontainers 启动真实 PostgreSQL，因此**本地必须能运行 Docker**。
 
-## 2. 启动数据库
+## 2. 一键启动（推荐）
+
+在源码根目录执行：
 
 ```bash
-cp .env.example .env          # 首次执行；本地开发可直接使用默认值
-docker compose -f docker-compose.dev.yml up -d
+./easyoactl dev
 ```
 
+Windows PowerShell：
+
+```powershell
+.\easyoactl.ps1 dev
+```
+
+启动器检查 JDK 21、Node.js 22.12+、Docker 与 Compose v2；缺少 `.env` 时生成随机数据库密码与会话密钥，
+已有文件保持原样。按锁文件安装缺失的前端依赖，然后依次等待 PostgreSQL、后端和前端就绪。
+数据库及本机服务仅监听回环地址，开发前端默认访问 `http://127.0.0.1:5173`。
+
+窗口保持运行，Ctrl+C 会停止本次启动的前后端进程，保留 PostgreSQL、数据卷与 `storage/files` 附件。
+日志在 `logs/dev/session.*`（Windows 为 `session-*`）；后端或前端提前退出时，启动器报错并清理本次应用进程。
+开发模式强制使用 `dev` profile，前端 `/api` 与 `/actuator` 代理会自动指向本次后端。
+
+| `.env` 配置 | 默认值 | 用途 |
+| ---- | ---- | ---- |
+| `POSTGRES_DEV_PORT` | `5432` | 本机 PostgreSQL 端口 |
+| `EASYOA_API_PORT` | `8080` | 本机 API 端口 |
+| `EASYOA_DEV_WEB_PORT` | `5173` | 本机前端端口 |
+| `EASYOA_DEV_SEED` | 新建开发配置为 `true` | 演示数据开关；设为 `false` 验证首次初始化 |
+
+开发入口允许同名环境变量覆盖这些配置。`.env` 只按字面读取，不作为脚本执行。
+本机附件路径固定为项目下的 `storage/files`，避免误用模板里的生产容器路径。
+macOS 会在当前 Java 不是 21 时尝试查找已安装的 JDK 21；否则需要自行设置 `JAVA_HOME` 与 `PATH`。
+首次 Maven 运行可能下载依赖；已有数据库卷的账号密码必须与 `.env` 一致，修改文件不会自动改数据库密码。
+
+## 3. 分别启动（需要独立调试时）
+
+先启动数据库：
+
+```bash
+./easyoactl dev --database-only
+```
+
+Windows 使用 `.\easyoactl.ps1 dev -DatabaseOnly`，此模式无需本机 Java / Node。
 该编排只启动一个 PostgreSQL 容器，并仅绑定 `127.0.0.1:5432`（不对局域网暴露）。
 
-## 3. 启动后端
+### 启动后端
+
+手动启动时，必须在当前终端设置与 `.env` 一致的 `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD`、
+`EASYOA_SESSION_SECRET` 和 `EASYOA_DB_URL=jdbc:postgresql://127.0.0.1:<数据库端口>/<数据库名>`；后端不会自动加载根目录 `.env`。
+设置 `EASYOA_STORAGE_PATH` 为本机附件目录，并按需要设置 `EASYOA_DEV_SEED`。
 
 ```bash
 cd backend
@@ -57,11 +97,11 @@ cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
-## 4. 启动前端
+### 启动前端
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev                  # http://localhost:5173
 ```
 
@@ -110,6 +150,9 @@ backend/src/main/java/com/easyoa/<module>/{controller,application,domain,reposit
 
 | 现象 | 处理 |
 | ---- | ---- |
+| 一键启动提示 JDK 版本错误 | 安装 JDK 21，检查 `JAVA_HOME` 与 `PATH`；JDK 17 无法编译本项目 |
+| API / Web 端口被占用 | 修改 `.env` 中对应开发端口；停止旧开发进程后重试 |
+| PostgreSQL 健康但 API 认证失败 | 既有数据库卷的密码与 `.env` 不一致；核对原配置，不要直接删除数据卷 |
 | 后端启动报 `Schema-validation: missing table` | Flyway 未执行成功，检查数据库连接与 `db/migration` 脚本 |
 | 集成测试卡住 | Docker 未运行；Testcontainers 需要能拉取 `postgres:16-alpine` |
 | 前端 401 循环跳转 | 检查是否通过 `npm run dev` 代理访问，而不是直连 8080 |

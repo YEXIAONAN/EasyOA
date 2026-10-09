@@ -2,7 +2,7 @@
 # EasyOA 前端镜像：Node 构建 → Nginx 静态托管
 # 只提供静态资源与 SPA 回退，/api 反向代理由边缘 Nginx（infra/nginx）完成。
 # ---------------------------------------------------------------------------
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./

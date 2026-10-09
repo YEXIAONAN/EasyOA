@@ -5,12 +5,12 @@
 <h3 align="center">面向学生团队、小公司、工作室的现代化、轻量级、私有化部署协同办公系统</h3>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-16A34A.svg" alt="License: MIT" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-16A34A.svg" alt="License: AGPL-3.0-only" /></a>
   <img src="https://img.shields.io/badge/Java-21-16A34A.svg" alt="Java 21" />
   <img src="https://img.shields.io/badge/Spring%20Boot-3.5-16A34A.svg" alt="Spring Boot 3.5" />
   <img src="https://img.shields.io/badge/Vue-3.5-16A34A.svg" alt="Vue 3" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-16A34A.svg" alt="PostgreSQL 16" />
-  <img src="https://img.shields.io/badge/version-v0.1.1-16A34A.svg" alt="v0.1.1" />
+  <img src="https://img.shields.io/badge/version-v0.2.0-16A34A.svg" alt="v0.2.0" />
 </p>
 
 ---
@@ -266,25 +266,21 @@ repository / dto` 分层；`v0.1.x` 不引入微服务、消息队列、Redis �
 
 ## Quick Start
 
-### 一键部署（推荐）
+### 一键部署（签名发行包）
+
+从 [GitHub Releases](https://github.com/YEXIAONAN/EasyOA/releases) 取得正式发行包，先通过独立可信公钥验证下载资产；完整的验证后安装流程见 [部署指南](docs/deployment.md)。v0.2.0 是本地待发布版本，当前尚未创建远程 Release。
 
 ```bash
-# 1. 准备环境变量
-cp .env.example .env
-#    必须修改：POSTGRES_PASSWORD、EASYOA_SESSION_SECRET（>= 32 位随机串）
-#    生成随机密钥：openssl rand -base64 48
-
-# 2. 准备 TLS 证书（本地/内网试用可自签名；生产请使用受信任证书）
-./scripts/generate-self-signed-cert.sh your-domain.com
-
-# 3. 启动
-docker compose up -d --build
-
-# 4. 查看状态
-docker compose ps
+# Linux / macOS，签名包内；本机试用允许生成自签名 TLS
+./easyoactl install --self-signed-tls
+./easyoactl start
 ```
 
-首次访问 `https://your-domain`（自签名证书需在浏览器中信任）：
+Windows 使用 `.\easyoactl.ps1 install -SelfSignedTls`。需要 Docker、Compose v2、curl 和支持 Ed25519 的 OpenSSL；下载与备份恢复需要 Python 3.11+。默认执行 `./easyoactl` 只显示帮助。
+
+已有配置保留，缺失 `.env` 生成随机密钥；正式上线配置域名与受信任证书。生产必须验签并检查受保护文件，失败拒绝启动，源码目录使用开发模式。常用 `status`、`logs`、`doctor`、`stop`、`restart`、`verify`、`backup`、`restore` 和目录式 `upgrade` 见部署指南。
+
+首次访问启动器显示的 HTTPS 地址（本机试用的自签名证书需在浏览器中信任）：
 
 1. 进入 `/setup` 初始化：设置组织名称、ROOT 用户名与密码；
 2. 初始化完成后 `/setup` 永久关闭；
@@ -295,14 +291,15 @@ docker compose ps
 见 [docs/local-development.md](docs/local-development.md)。最短路径：
 
 ```bash
-cp .env.example .env
-docker compose -f docker-compose.dev.yml up -d      # 仅启动 PostgreSQL（绑定 127.0.0.1）
-
-cd backend && ./mvnw spring-boot:run                # http://localhost:8080
-cd frontend && npm install && npm run dev           # http://localhost:5173
+./easyoactl dev
 ```
 
-开发环境（`dev` profile）会自动注入演示账号：`root`（ROOT）/ `admin`（ADMIN）/ `member`（MEMBER），
+Windows 使用 `.\easyoactl.ps1 dev`。准备 JDK 21、Node.js 22.12+ 与 Docker 后，一个入口会启动 PostgreSQL、本机后端与前端，
+前端默认访问 `http://127.0.0.1:5173`。保持启动窗口打开；按 Ctrl+C 停止前后端，数据库与附件保留，日志位于 `logs/dev/`。
+只需要数据库时使用 `./easyoactl dev --database-only`（Windows：`dev -DatabaseOnly`）。
+
+新生成的开发配置默认开启演示数据；已有 `.env` 按 `EASYOA_DEV_SEED` 设置决定。
+开启后会注入演示账号：`root`（ROOT）/ `admin`（ADMIN）/ `member`（MEMBER），
 初始密码均为 `EasyOA@2026`；**生产环境绝不会创建任何演示数据**。
 如需验证首次初始化（`/setup`）流程，用 `EASYOA_DEV_SEED=false` 启动后端即可跳过种子数据。
 
@@ -419,7 +416,9 @@ EasyOA/
 │       ├── styles/                # Design Tokens / 基础样式 / Element 主题映射
 │       └── views/                 # 登录 / 初始化 / 工作台 / 安全中心 / 数据中心 / 审计 / 403 / 404
 ├── infra/nginx/                   # 边缘 Nginx 配置与证书目录
-├── scripts/                       # 运维脚本（自签名证书等）
+├── easyoactl / easyoactl.ps1        # 统一部署与开发命令入口
+├── scripts/                       # 启动引导、签名打包与校验、回归测试
+├── integrity/                     # 发布完整性说明与可信公钥（发布前配置）
 ├── docs/                          # 部署与开发文档、截图、Logo
 ├── docker-compose.yml             # 生产编排
 └── docker-compose.dev.yml         # 本地开发（仅 PostgreSQL）
@@ -431,7 +430,8 @@ EasyOA/
 
 | 版本 | 内容 |
 | ---- | ---- |
-| **v0.1.1**（当前） | 补齐**安全**（TOTP、ROOT 高危操作通道、审计与安全事件视图、安全设置）与**数据中心**（项目健康度 / 任务趋势 / 逾期与负载 / 审批效率）；修复侧边栏在矮视口下导航末项被页脚遮挡 |
+| **v0.2.0**（待发布） | Community Edition 采用 AGPL-3.0-only；统一 easyoactl、签名发行包、Tag 自动 Release、About 与对应源码入口；历史 MIT 授权保留 |
+| **v0.1.1**（历史 MIT） | 补齐**安全**（TOTP、ROOT 高危操作通道、审计与安全事件视图、安全设置）与**数据中心**（项目健康度 / 任务趋势 / 逾期与负载 / 审批效率）；修复侧边栏在矮视口下导航末项被页脚遮挡 |
 | v0.1.0 | 首个版本：认证与账号、组织架构、项目协作、任务执行、评论与文件、审批、工作台，以及 Docker Compose / Nginx / CI / Flyway 工程基建 |
 
 ---
@@ -456,4 +456,6 @@ cp .env.example .env && docker compose -f docker-compose.yml config -q
 
 ## License
 
-[MIT](LICENSE) © 2026 EasyOA — Easy Series
+[AGPL-3.0-only](LICENSE) © 2026 YEXIAONAN 与贡献者。自 v0.2.0 起的新 Community Edition 使用此许可证；历史已发布 MIT 版本继续适用原许可证，见 [NOTICE](NOTICE)。修改后通过网络提供服务时，须按 AGPL 提供对应源码；`/about` 提供源码入口，修改后的部署可设置 `EASYOA_SOURCE_URL`。项目没有 Pro 激活或功能锁。
+
+![v0.2.0 关于页，开发构建](docs/screenshots/about.png)

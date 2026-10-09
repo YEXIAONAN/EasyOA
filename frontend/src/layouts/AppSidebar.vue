@@ -133,6 +133,10 @@ const visibleGroups = computed(() =>
     </nav>
 
     <div class="sidebar__footer">
+      <router-link class="sidebar__item" :to="{ name: 'about' }" title="关于 EasyOA">
+        <el-icon class="sidebar__item-icon"><Document /></el-icon>
+        <span v-if="!ui.sidebarCollapsed">关于</span>
+      </router-link>
       <button
         type="button"
         class="sidebar__collapse"

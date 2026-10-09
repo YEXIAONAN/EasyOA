@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate semantic tag and all version sources
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/release/version.py --tag "$RELEASE_TAG"
+      - name: Refuse an existing release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/release/publish.py check --tag "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
+
+  ci:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    needs: [validate, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build, sign and validate all release assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          EASYOA_RELEASE_SIGNING_KEY: ${{ secrets.EASYOA_RELEASE_SIGNING_KEY }}
+          EASYOA_RELEASE_PUBLIC_KEY: ${{ vars.EASYOA_RELEASE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key_dir="$(mktemp -d)"
+          trap 'rm -rf "$key_dir"' EXIT
+          test -n "$EASYOA_RELEASE_SIGNING_KEY" || { echo 'Missing Secret: EASYOA_RELEASE_SIGNING_KEY'; exit 1; }
+          printf '%s\n' "$EASYOA_RELEASE_SIGNING_KEY" > "$key_dir/private.pem"
+          if test -s integrity/release-public-key.pem; then
+            cp integrity/release-public-key.pem "$key_dir/public.pem"
+          else
+            test -n "$EASYOA_RELEASE_PUBLIC_KEY" || { echo 'Missing trusted release public key'; exit 1; }
+            printf '%s\n' "$EASYOA_RELEASE_PUBLIC_KEY" > "$key_dir/public.pem"
+          fi
+          bash scripts/release/build-release.sh --tag "$RELEASE_TAG" --output release \
+            --signing-key "$key_dir/private.pem" --public-key "$key_dir/public.pem"
+      - name: Publish GitHub Release and upload verified assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/release/publish.py publish --tag "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --assets release/assets

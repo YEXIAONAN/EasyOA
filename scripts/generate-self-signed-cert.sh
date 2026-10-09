@@ -6,12 +6,12 @@
 # 并把证书与私钥放到 infra/nginx/certs/ 下，文件名保持 easyoa.crt / easyoa.key。
 #
 # 用法：
-#   ./scripts/generate-self-signed-cert.sh [域名或IP]
+#   ./scripts/generate-self-signed-cert.sh [域名或IP] [证书目录]
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CERT_DIR="${SCRIPT_DIR}/../infra/nginx/certs"
+CERT_DIR="${2:-${SCRIPT_DIR}/../infra/nginx/certs}"
 DOMAIN="${1:-localhost}"
 
 mkdir -p "${CERT_DIR}"

@@ -13,15 +13,23 @@
 
   <groupId>com.easyoa</groupId>
   <artifactId>easyoa-api</artifactId>
-  <version>0.1.1</version>
+  <version>0.2.0</version>
   <name>easyoa-api</name>
   <description>EasyOA — 面向学生团队 / 小公司 / 工作室的私有化协同办公系统</description>
+  <licenses>
+    <license>
+      <name>AGPL-3.0-only</name>
+      <url>https://www.gnu.org/licenses/agpl-3.0.html</url>
+    </license>
+  </licenses>
 
   <properties>
     <java.version>21</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <springdoc.version>2.8.13</springdoc.version>
+    <easyoa.release.key.fingerprint></easyoa.release.key.fingerprint>
+    <easyoa.source.ref></easyoa.source.ref>
   </properties>
 
   <dependencies>
@@ -104,6 +112,18 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>false</filtering>
+        <excludes><exclude>easyoa-build.properties</exclude></excludes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+        <includes><include>easyoa-build.properties</include></includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

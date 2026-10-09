@@ -10,9 +10,8 @@
 #   * 密钥全部来自 .env（不提交仓库）。
 #
 # 使用：
-#   cp .env.example .env && 修改密钥
-#   ./scripts/generate-self-signed-cert.sh   # 或替换为自己的证书
-#   docker compose up -d --build
+#   Signed release: ./easyoactl install / start
+#   Source development: ./easyoactl dev
 # =============================================================================
 name: easyoa
 
@@ -40,6 +39,9 @@ services:
   easyoa-api:
     build:
       context: ./backend
+      args:
+        RELEASE_KEY_FINGERPRINT: ${EASYOA_RELEASE_KEY_FINGERPRINT:-}
+        SOURCE_REF: ${EASYOA_SOURCE_REF:-}
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${EASYOA_PROFILE:-prod}
@@ -50,6 +52,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       EASYOA_SESSION_SECRET: ${EASYOA_SESSION_SECRET:?EASYOA_SESSION_SECRET 未配置}
       EASYOA_BASE_URL: ${EASYOA_BASE_URL:-https://localhost}
+      EASYOA_SOURCE_URL: ${EASYOA_SOURCE_URL:-}
       EASYOA_SESSION_TIMEOUT_MINUTES: ${EASYOA_SESSION_TIMEOUT_MINUTES:-480}
       EASYOA_LOGIN_MAX_FAILURES: ${EASYOA_LOGIN_MAX_FAILURES:-5}
       EASYOA_LOGIN_LOCK_MINUTES: ${EASYOA_LOGIN_LOCK_MINUTES:-15}
@@ -57,6 +60,7 @@ services:
       TZ: UTC
     volumes:
       - easyoa-storage:${EASYOA_STORAGE_PATH:-/var/lib/easyoa/storage}
+      - ./integrity:/opt/easyoa-integrity:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -155,6 +155,7 @@ async function submit(): Promise<void> {
           创建组织并进入 EasyOA
         </EasyButton>
       </form>
+      <router-link class="setup__about" :to="{ name: 'about' }">关于 EasyOA · 获取源码</router-link>
 
       <p class="setup__note">
         ROOT 的高危操作（审计清理、安全策略变更、数据销毁等）在执行时还需要重新验证密码与 TOTP。
@@ -164,6 +165,7 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+.setup__about { display: inline-block; margin-top: var(--easy-space-5); color: var(--easy-brand-text); font-size: var(--easy-text-sm); }
 .setup {
   min-height: 100vh;
   display: flex;

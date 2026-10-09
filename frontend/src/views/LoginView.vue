@@ -168,6 +168,7 @@ async function submit(): Promise<void> {
               登录
             </EasyButton>
           </form>
+          <router-link class="auth__about" :to="{ name: 'about' }">关于 EasyOA · 获取源码</router-link>
         </div>
       </div>
     </section>
@@ -175,6 +176,7 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+.auth__about { display: inline-block; margin-top: var(--easy-space-5); color: var(--easy-text-3); font-size: var(--easy-text-sm); }
 .auth {
   display: grid;
   grid-template-columns: minmax(360px, 0.9fr) minmax(440px, 1.1fr);

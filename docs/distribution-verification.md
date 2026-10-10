@@ -2,6 +2,7 @@
 
 验收日期：2026-10-08 至 2026-10-09。工作区版本：`0.2.0`。
 本记录对应本次发行基础设施实现。业务 Phase 8 / Phase 9 已交付的范围保持不变。
+以下为该次历史记录；2026-10-10 至 2026-10-11 的 RC 验收结果在文末追加。
 
 ## License / Version
 
@@ -103,3 +104,53 @@ Tag 模式、版本一致性、Workflow 语法和依赖门禁已在本地检查�
 - 没有实现 Pro、License Key、激活、设备绑定或功能限制。
 
 八项最终结论：新版本 AGPL-3.0-only **YES**；历史 MIT 说明 **YES**；取消旧 start 入口 **YES**；生产强制签名 **YES**；篡改拒绝启动实测 **YES**；源码开发可用实测 **YES**；私钥未进入 Git **YES**；未实现任何 Pro / 激活逻辑 **YES**。
+
+## v0.2.0-rc.1 Release Candidate Validation（2026-10-10 至 2026-10-11）
+
+本次冻结业务范围，只修复验收发现的问题并补充部署文档。主工作区四个版本源保持 `0.2.0`，README 保留待发布状态；隔离源码快照使用版本工具同步为 `0.2.0-rc.1`，真实构建、签名及部署该 RC。**签名使用一次性 Ed25519 测试密钥，验收包不是官方发行。** 私钥只位于仓库外临时目录，构建结束后删除。
+
+### 修复
+
+- Release / startup 测试夹具原先固定 `0.2.0`，导致合法 RC checkout 的完整脚本回归失败。改为读取 `VERSION`；稳定升级用例显式建立稳定版本夹具，增加 RC 安装与 RC Pre-release 标志回归。
+- 恰好 20 MiB 的合法附件原先因 multipart 头部超过同为 20 MiB 的请求总上限而返回 413。请求总上限改为 25 MiB，与边缘 Nginx 已有 `25m` 配置一致，单文件默认上限保持 20 MiB。新增真实 Tomcat HTTP 集成测试，验证最大文件上传、下载哈希以及多 1 字节拒绝；修正部署文档中对 Nginx 默认上限的错误描述。
+- 在 [部署指南](deployment.md) 增加 v0.1.1 的 **Manual Migration Required** 步骤，明确旧目录 / 卷保留、匹配数据库凭据与会话密钥、独立目标卷、恢复前安全备份及失败处理。
+
+### 本地结果
+
+| Gate | 结果及实际证据 |
+| --- | --- |
+| Backend | JDK 21，`./mvnw test` 和 `./mvnw package` 均 PASS；最终 18 份 Surefire 报告共 114 tests，0 failures / errors / skipped，真实 PostgreSQL / Flyway / JPA 校验 |
+| Frontend | Node 22，`npm ci`、`npm run type-check`、`npm run build` 均 PASS |
+| Compose / 静态 | 生产与开发 Compose、真实 Nginx 代理回归、Bash / PowerShell 解析、actionlint、四版本源校验、`git diff --check` PASS |
+| Script regression | main 与 RC 快照完整套件各 30 项 PASS，0 skipped；包括 macOS 原生 PowerShell 7.4.13 签名与配置用例、真实 Docker 代理用例；提交前 main 完整套件再次 PASS |
+| Release build / assets | 最终修复快照真实 Docker build / pull、离线镜像、94 个保护文件、六项资产、两份 Ed25519 签名、归档 SHA-256 / 安全解压 PASS；无 `.env`、Git、数据、附件、备份、日志、node_modules 或签名私钥 |
+| Integrity | 正常包 PASS；文件改 1 byte、缺失文件、篡改清单、篡改签名、错误公钥、缺失清单均验证失败，生产 start 在生成配置或创建容器前拒绝 |
+| Clean deployment / setup | 外部资产验证后解压至独立目录，独立数据库及附件卷，install / start PASS；新库无 Demo Seed，真实 HTTP 创建组织和 ROOT，再次初始化返回 409，浏览器 `/setup` 转向已初始化入口 |
+| Business | 真实 HTTP 完成成员、组织单位、项目成员、任务状态、评论、附件、审批提交与批准、通知与已读、全局搜索、数据中心、审计；通过 Edge 验证任务抽屉 deep link、刷新、关闭、后退 / 前进和搜索跳转 |
+| Permissions | ROOT / ADMIN / MEMBER 及非项目成员验证 PASS；管理操作、跨资源 ID、评论 / 附件下载 / 审批 / 通知范围、缺失 CSRF、自批、归档写入均拒绝；普通安全事件修改 / 删除无入口；禁用账号使原会话 401 |
+| File size boundary | 最终签名包经 HTTPS / Nginx 上传恰好 20 MiB 并下载比对字节 / SHA-256 PASS；20 MiB + 1 byte 返回 413，已有文件仍可读取 |
+| Backup / restore | 含真实业务数据和 20 MiB 附件的一致性备份 PASS；格式、校验值、私有权限与无签名私钥检查 PASS；另一新目录和全新数据卷实际 restore，登录核对 User / Organization / Project / Task / Approval / Comment / Attachment 全部 PASS，通知、审计和访问范围保留 |
+| Persistence / session | 最终恢复环境实际 stop → start，再 restart，七类数据及两份附件字节 / 哈希保留；`.env` 与 TLS 哈希不变；原 servlet 会话返回 401，重新登录成功 |
+| Status / doctor / logs | 真实生产容器、HTTPS、API / 数据库健康、签名身份和附件存储诊断 PASS；logs 显示真实迁移和请求记录 |
+| Development mode | 独立源码、开发数据库 / 端口实际启动 API + Vite，明确 Development Build，不要求发行签名；源码改动可见，退出清理自有进程 |
+| UI | Edge 实际截图检查 1440×900、1280×800、1024×768、1024×600；短视口侧栏可滚动到审计入口，任务抽屉和真实数据页面可用；viewport 已重置。最终重建包的前端 dist 哈希与已检查版本一致 |
+| Legacy schema | 下载并核对 v0.1.1 官方镜像归档 SHA-256，启动旧 API 并通过 HTTP 建立业务数据；导出后恢复到最终 RC 的独立新卷，七类数据与访问范围 PASS；八项 Flyway 版本 / checksum 不变且校验成功，历史 SQL 与 v0.1.1 完全相同 |
+
+本地证据保存在 Git 忽略的 `.ai-local/rc-validation/`，每项命令有日志、退出码和运行时间。最终资产在 `release-rc1-fixed/assets/`；最终恢复和迁移环境分别为 `easyoa-rc-fixed-restore` 与 `easyoa-rc-fixed-migrated`。测试使用合成数据，原有开发数据库卷未使用。备份含部署秘密，仅供本机私有保存，不随代码发布。
+
+### 正式 RC 发布阻塞
+
+通过已登录 Edge 查看仓库 Actions 配置：Repository / Environment Secrets 均为空，Repository / Environment Variables 均为空；仓库也没有 `integrity/release-public-key.pem`。
+
+1. **Missing GitHub Secret: `EASYOA_RELEASE_SIGNING_KEY`。** 维护者需在仓库外生成并安全保管官方 Ed25519 私钥，将其配置到此 Actions Secret，不能使用本地已删除的测试密钥。
+2. **缺少官方公钥与信任依据。** 提交匹配的 `integrity/release-public-key.pem`，或设置 Repository Variable `EASYOA_RELEASE_PUBLIC_KEY`，并独立公布 DER SHA-256 指纹。
+3. **Official Asset Verification 未完成。** 缺少上述配置，因此未准备主分支 RC 版本、未创建 / 推送 `v0.2.0-rc.1` Tag，未触发 Release Workflow，未创建 GitHub Pre-release。正式六资产上传、重新从 GitHub 下载、验证及干净安装尚无真实证据；本地测试包和发布 API 测试替身不能替代。
+
+### 已知限制及后续
+
+- v0.1.1 → v0.2.0 必须手动迁移；本次已经实测，未宣称一键升级。旧 v0.1.1 Nginx 的 location 头部覆盖会发送含下划线的 upstream Host，导致旧 API 400；为了准备旧版测试数据，只在隔离旧环境显式补齐转发头。旧 Tag / 官方镜像不变，当前版本原有代理修复及其真实回归已通过。
+- 当前离线镜像为 linux/amd64；Windows backup / restore / upgrade 明确不支持。macOS 的原生 PowerShell 验证不等于 Windows Docker 生产启动验收；原生 Windows 脚本结果仍由普通 push 的 GitHub CI 提供。
+- MINOR：审计页文案把普通审计与永久安全事件统称为无删除入口，应说明 ROOT 受控审计清理例外；API 权限与永久安全事件边界已通过，文案延后。
+- Deferred to v0.2.1：会话 / TOTP 加密密钥用途分离、Playwright 自动化、Dependabot、CodeQL、SBOM，以及上述小文案修正；本次未扩展这些范围。
+
+**结论：NOT READY FOR v0.2.0。** 本地产品验收通过；官方签名配置、真实 RC 发布及官方下载资产验收仍是阻塞项。保持 README 待发布状态，不发布无签名包，不跳过任何门禁。

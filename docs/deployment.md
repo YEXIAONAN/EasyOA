@@ -75,7 +75,7 @@ cd /srv/EasyOA-v0.2.0
 | `EASYOA_SESSION_TIMEOUT_MINUTES` | `480` 分钟 | 会话超时，当前生产 Compose 传入 API |
 | `EASYOA_LOGIN_MAX_FAILURES` / `EASYOA_LOGIN_LOCK_MINUTES` | `5` 次 / `15` 分钟 | 后端回退值；数据库安全设置存在时优先使用系统设置 |
 | `EASYOA_STORAGE_PATH` | 生产 `/var/lib/easyoa/storage` | Compose 附件卷挂载与 API 路径；dev 入口固定为项目内 `storage/files` |
-| `EASYOA_STORAGE_MAX_FILE_SIZE` | `20971520` 字节（20 MiB） | 应用 multipart 上限；当前生产 Compose 未转发，单改 `.env` 不生效 |
+| `EASYOA_STORAGE_MAX_FILE_SIZE` | `20971520` 字节（20 MiB） | 应用 multipart 单文件上限；请求总上限为 25 MiB，预留 multipart 头部空间。当前生产 Compose 未转发，单改 `.env` 不生效 |
 | `EASYOA_ORG_NAME` | `Easy Studio` | 应用初始化页面默认组织名；当前生产 Compose 未转发，初始化时也可填写 |
 | `EASYOA_HTTP_PORT` / `EASYOA_HTTPS_PORT` | `80` / `443` | 边缘 Nginx 的宿主机端口 |
 | `EASYOA_TLS_CERT_DIR` | `./infra/nginx/certs` | 宿主机证书目录，可为绝对路径 |
@@ -140,6 +140,66 @@ Windows 对应 `.\easyoactl.ps1 install -SelfSignedTls`；自签名证书不关�
 
 新包先通过可信下载流程取得，放到新的空部署目录。旧的未签名源码部署不能直接运行此 upgrade，需要先备份并人工迁移到首个签名部署目录。升级验证旧/新包、同一信任公钥以及版本严格增加，拒绝新目录已有 `.env`，先备份，再复制配置和相对目录中的 TLS，停止旧服务，从新目录启动。保持 Compose 项目名 `easyoa` 或部署时既有 `COMPOSE_PROJECT_NAME`，复用原数据库与附件卷。升级不删除旧目录，不支持降级、预发布自动升级、在线版本查询或自动下载。密钥轮换须单独审核。Flyway 升级失败时不会自动回滚数据库，须根据安全备份与迁移状态人工恢复。
 
+### v0.1.1 → v0.2.0：Manual Migration Required
+
+v0.1.1 使用旧启动入口与未签名镜像发行，没有 `easyoactl` 或签名清单，不能直接执行上述自动升级。首次迁移应在维护窗口中导出数据库、附件、配置与 TLS，再恢复到签名包的**独立数据卷**。保留旧目录和旧卷；不要使用 `down -v`、修改历史 Flyway SQL、清空迁移记录或 `repair` 来强行启动。
+
+以下示例供正式签名 v0.2.0 包可用后使用。在开放新部署访问前完成恢复和核对；先确认旧部署确为 v0.1.1，并取得、验证和解压新包。修改路径、旧 Compose 文件、项目名和 TLS 目录，使其对应实际部署；旧文件可能是 `docker-compose.offline.yml`。
+
+```bash
+old_dir=/srv/EasyOA-v0.1.1
+new_dir=/srv/EasyOA-v0.2.0
+legacy_project=easyoa
+legacy_compose_file="$old_dir/docker-compose.yml"
+legacy_tls_dir="$old_dir/infra/nginx/certs"
+legacy_compose=(docker compose --project-directory "$old_dir" \
+  --env-file "$old_dir/.env" -p "$legacy_project" -f "$legacy_compose_file")
+
+umask 077
+mkdir -p "$new_dir/backups"
+migration_backup="$(mktemp -d "$new_dir/backups/v0.1.1-migration-XXXXXX")"
+"${legacy_compose[@]}" stop easyoa-api
+"${legacy_compose[@]}" exec -T postgres sh -c \
+  'exec pg_dump --format=custom --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+  > "$migration_backup/database.dump"
+"${legacy_compose[@]}" run --rm -T --no-deps --entrypoint sh easyoa-api -c \
+  'tar -C "$EASYOA_STORAGE_PATH" -czf - .' > "$migration_backup/storage.tar.gz"
+cp "$old_dir/.env" "$migration_backup/.env"
+cp "$legacy_tls_dir/easyoa.crt" "$migration_backup/easyoa.crt"
+cp "$legacy_tls_dir/easyoa.key" "$migration_backup/easyoa.key"
+printf '0.1.1\n' > "$migration_backup/VERSION"
+printf '1\n' > "$migration_backup/FORMAT"
+```
+
+每个导出命令必须成功；任何失败都先停止后续步骤并处理原因。快照中的 `.env` 必须保留原 `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD` 和 `EASYOA_SESSION_SECRET`，后者还用于解密已有 TOTP。确认 `EASYOA_PROFILE=prod`、`EASYOA_DEV_SEED=false`，以及目标端口、域名和 TLS 路径；绝对 TLS 路径应改为新部署保存证书的目录。这些非凭据配置调整须在生成快照校验清单之前完成。旧凭据不满足新启动器安全要求时，先制定数据库凭据轮换方案，不能只编辑 `.env`。
+
+```bash
+python3 "$new_dir/scripts/release/backup.py" write "$migration_backup"
+cp "$migration_backup/.env" "$new_dir/.env"
+chmod 600 "$new_dir/.env"
+# 默认相对 TLS 路径；若已配置其他路径，改为对应目录。
+mkdir -p "$new_dir/infra/nginx/certs"
+cp "$migration_backup/easyoa.crt" "$new_dir/infra/nginx/certs/easyoa.crt"
+cp "$migration_backup/easyoa.key" "$new_dir/infra/nginx/certs/easyoa.key"
+python3 "$new_dir/scripts/release/backup.py" check "$migration_backup" --current "$new_dir"
+
+"${legacy_compose[@]}" stop
+cd "$new_dir"
+# 必须选择未被其他部署使用的项目名，创建独立的数据库与附件卷。
+export COMPOSE_PROJECT_NAME=easyoa-v020-migration
+./easyoactl verify
+./easyoactl install
+# 不在空库创建新的 ROOT；恢复旧组织及账号。输入 RESTORE 确认。
+./easyoactl restore "$migration_backup"
+./easyoactl status
+./easyoactl doctor
+./easyoactl logs easyoa-api
+```
+
+恢复会先给目标空库做安全备份，再导入旧快照并启动。核对 Flyway 校验、原 ROOT / ADMIN / MEMBER 登录、用户和组织、项目、任务状态、已完成审批、评论及附件下载字节，再核对通知、审计和资源访问范围。重启会使原浏览器会话失效，应重新登录；配置与业务数据应保留。失败时保留新旧卷和两份备份，停用新入口，根据迁移日志人工恢复，不假定数据库自动回滚。
+
+2026-10-10 已使用 v0.1.1 官方镜像和真实 HTTP 创建的业务数据，向临时测试密钥签名的 `0.2.0-rc.1` 独立部署演练此流程；七类数据和附件字节通过核对，原有八项 Flyway 迁移校验成功且未修改历史。这是本地手动迁移证据，正式发行资产仍需 GitHub 下载验收。
+
 ## GitHub Release Pipeline
 
 `.github/workflows/release.yml` 仅由 `push tag v*.*.*` 触发：
@@ -191,7 +251,7 @@ release-public-key.pem
 | 容器反复重启 | 查看 API / 数据库日志的第一处错误，检查数据库密码、Flyway 和磁盘；先备份，不删除卷 |
 | HTTPS 健康检查失败 | 检查端口冲突、Nginx、证书挂载、API 健康和 About 签名身份 |
 | 重启后登录失效 / TOTP 验证失败 | 检查是否更换会话密钥；按密钥轮换和恢复方案处理，不反复替换随机密钥 |
-| 上传失败 / 413 | 应用 multipart 默认 20 MiB；边缘 Nginx 未显式设置 `client_max_body_size`，还受代理默认限制。单改 `.env` 中文件上限不会传入当前生产容器，部署调整需同时处理各层和签名 |
+| 上传失败 / 413 | 默认单文件最多 20 MiB；应用请求总上限与边缘 Nginx `client_max_body_size 25m` 均为 25 MiB，包含 multipart 头部。单改 `.env` 中文件上限不会传入当前生产容器，部署调整需同时处理各层和签名 |
 | 恢复或升级失败 | API 保持停止，保留安全备份；核对备份格式、数据库身份和迁移状态后人工恢复，不假定自动回退 |
 | ARM64 / Windows 运维受限 | 当前归档为 linux/amd64；Windows backup / restore / upgrade 尚不支持，按已验证平台执行 |
 

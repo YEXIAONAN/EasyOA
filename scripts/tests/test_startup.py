@@ -105,7 +105,8 @@ if any('/api/system/about' in a for a in sys.argv):
         return private,public
     def signed_bundle(self):
         private,public=self.keypair();output=self.base/'release'
-        r=self.invoke([BASH,str(self.root/'scripts/integrity/package-release.sh'),'--version','v0.2.0','--output',str(output),'--signing-key',str(private),'--public-key',str(public)])
+        tag='v'+(self.root/'VERSION').read_text(encoding='utf-8').strip()
+        r=self.invoke([BASH,str(self.root/'scripts/integrity/package-release.sh'),'--version',tag,'--output',str(output),'--signing-key',str(private),'--public-key',str(public)])
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertFalse((output/'.env').exists());self.assertFalse((output/'infra/nginx/certs/easyoa.key').exists())
         self.assertNotIn('build:',(output/'docker-compose.yml').read_text(encoding='utf-8'))
@@ -136,7 +137,8 @@ if any('/api/system/about' in a for a in sys.argv):
     @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
     def test_stale_api_image_is_not_signed_or_packaged(self):
         self.env['TEST_STALE_IMAGE']='1';private,public=self.keypair();output=self.base/'bad release'
-        r=self.invoke([BASH,str(self.root/'scripts/integrity/package-release.sh'),'--version','v0.2.0','--output',str(output),'--signing-key',str(private),'--public-key',str(public)])
+        tag='v'+(self.root/'VERSION').read_text(encoding='utf-8').strip()
+        r=self.invoke([BASH,str(self.root/'scripts/integrity/package-release.sh'),'--version',tag,'--output',str(output),'--signing-key',str(private),'--public-key',str(public)])
         self.assertNotEqual(r.returncode,0);self.assertIn('API image build metadata does not match',r.stdout+r.stderr)
         self.assertFalse((output/'integrity/manifest.sig').exists());self.assertFalse(any('save' in a for a in self.commands()))
 
@@ -146,6 +148,16 @@ if any('/api/system/about' in a for a in sys.argv):
         values=dict(line.split('=',1) for line in (self.root/'.env').read_text(encoding='utf-8').splitlines() if '=' in line and not line.startswith('#'))
         self.assertGreaterEqual(len(values['EASYOA_SESSION_SECRET']),32);self.assertNotIn('CHANGE_ME',values['POSTGRES_PASSWORD'])
         self.assertEqual(values['EASYOA_DEV_SEED'],'false');self.assertNotIn(values['EASYOA_SESSION_SECRET'],r.stdout+r.stderr)
+
+    @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
+    def test_prerelease_bundle_preserves_version_and_installs(self):
+        (self.root/'VERSION').write_text('0.2.0-rc.1\n',encoding='utf-8',newline='\n')
+        r=self.invoke(['python3',str(self.root/'scripts/release/version.py'),'--sync'])
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.signed_bundle();self.valid_env()
+        r=self.cli('install');self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertEqual((self.root/'VERSION').read_text(encoding='utf-8'),'0.2.0-rc.1\n')
+        self.assertIn('0.2.0-rc.1',r.stdout+r.stderr)
 
     @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
     def test_unsafe_configuration_and_unhealthy_services_fail(self):
@@ -190,6 +202,10 @@ if any('/api/system/about' in a for a in sys.argv):
 
     @unittest.skipUnless(BASH and SSL,'requires Bash/OpenSSL')
     def test_upgrade_validates_before_backup_and_preserves_old_deployment(self):
+        # Automatic upgrades deliberately use stable versions, even on an RC checkout.
+        (self.root/'VERSION').write_text('0.2.0\n',encoding='utf-8',newline='\n')
+        r=self.invoke(['python3',str(self.root/'scripts/release/version.py'),'--sync'])
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         private,_=self.signed_bundle();original=self.valid_env();target=self.base/'new release'
         shutil.copytree(self.root,target,ignore=shutil.ignore_patterns('.env','backups','certs'))
         (target/'VERSION').write_text('0.2.1\n',encoding='utf-8',newline='\n')

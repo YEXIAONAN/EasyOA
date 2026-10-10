@@ -39,8 +39,9 @@ class FakeGitHub:
 
 class VersionTests(unittest.TestCase):
     def test_all_version_sources_and_tag_match(self):
-        self.assertEqual(version.check(SOURCE,'v0.2.0'),'0.2.0')
-        with self.assertRaises(ValueError):version.check(SOURCE,'v0.2.1')
+        current=version.validate((SOURCE/'VERSION').read_text(encoding='utf-8').strip())
+        self.assertEqual(version.check(SOURCE,'v'+current),current)
+        with self.assertRaises(ValueError):version.check(SOURCE,'v'+current+'-mismatch')
     def test_semantic_versions_include_prereleases_and_reject_invalid_numbers(self):
         for v in ['0.2.0','1.0.0','0.2.0-beta.1','0.2.0-rc.1']:self.assertEqual(version.validate(v),v)
         for v in ['v0.2.0','0.2','01.2.0','0.2.0-beta.01','0.2.0-','0.2.0;whoami']:
@@ -137,8 +138,10 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue(posts[0][2]['generate_release_notes']);self.assertFalse(posts[0][2]['prerelease'])
         self.assertEqual(len(client.assets),6);self.assertEqual(client.calls[-1][0],'PATCH');self.assertFalse(client.calls[-1][2]['draft'])
     def test_prerelease_is_published_as_prerelease(self):
-        self.make_assets('v0.2.0-beta.1');client=FakeGitHub();publish.publish(client,'test/EasyOA','v0.2.0-beta.1',self.assets)
-        self.assertTrue(client.calls[-1][2]['prerelease']);self.assertFalse(client.calls[-1][2]['draft'])
+        for tag in ['v0.2.0-beta.1','v0.2.0-rc.1']:
+            with self.subTest(tag=tag):
+                self.make_assets(tag);client=FakeGitHub();publish.publish(client,'test/EasyOA',tag,self.assets)
+                self.assertTrue(client.calls[-1][2]['prerelease']);self.assertFalse(client.calls[-1][2]['draft'])
     def test_existing_release_never_overwritten(self):
         client=FakeGitHub(exists=True)
         with self.assertRaisesRegex(ValueError,'Release v0.2.0 already exists'):publish.publish(client,'test/EasyOA','v0.2.0',self.assets)

@@ -36,7 +36,8 @@ spring:
   servlet:
     multipart:
       max-file-size: ${EASYOA_STORAGE_MAX_FILE_SIZE:20971520}
-      max-request-size: ${EASYOA_STORAGE_MAX_FILE_SIZE:20971520}
+      # Allow multipart headers above the 20 MiB file limit; match the edge's 25 MiB body limit.
+      max-request-size: 26214400
 
 server:
   port: ${EASYOA_API_PORT:8080}

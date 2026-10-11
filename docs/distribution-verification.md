@@ -138,7 +138,7 @@ Tag 模式、版本一致性、Workflow 语法和依赖门禁已在本地检查�
 
 本地证据保存在 Git 忽略的 `.ai-local/rc-validation/`，每项命令有日志、退出码和运行时间。最终资产在 `release-rc1-fixed/assets/`；最终恢复和迁移环境分别为 `easyoa-rc-fixed-restore` 与 `easyoa-rc-fixed-migrated`。测试使用合成数据，原有开发数据库卷未使用。备份含部署秘密，仅供本机私有保存，不随代码发布。
 
-### 正式 RC 发布阻塞
+### 当次正式 RC 发布阻塞（历史）
 
 通过已登录 Edge 查看仓库 Actions 配置：Repository / Environment Secrets 均为空，Repository / Environment Variables 均为空；仓库也没有 `integrity/release-public-key.pem`。
 
@@ -153,4 +153,22 @@ Tag 模式、版本一致性、Workflow 语法和依赖门禁已在本地检查�
 - MINOR：审计页文案把普通审计与永久安全事件统称为无删除入口，应说明 ROOT 受控审计清理例外；API 权限与永久安全事件边界已通过，文案延后。
 - Deferred to v0.2.1：会话 / TOTP 加密密钥用途分离、Playwright 自动化、Dependabot、CodeQL、SBOM，以及上述小文案修正；本次未扩展这些范围。
 
-**结论：NOT READY FOR v0.2.0。** 本地产品验收通过；官方签名配置、真实 RC 发布及官方下载资产验收仍是阻塞项。保持 README 待发布状态，不发布无签名包，不跳过任何门禁。
+**当次结论：NOT READY FOR v0.2.0。** 本地产品验收通过；官方签名配置、真实 RC 发布及官方下载资产验收仍是阻塞项。保持 README 待发布状态，不发布无签名包，不跳过任何门禁。
+
+
+## 官方 v0.2.0-rc.1 发布（2026-10-11）
+
+用户已完成官方签名配置；本次 `main` 的 VERSION、Maven、前端 package / lock 已同步为 `0.2.0-rc.1`，README 和部署指南明确标为 Release Candidate / Pre-release，Stable v0.2.0 尚未发布。本次不增加业务功能，不修改数据库迁移或权限规则。
+
+- 已通过 Edge 在 Repository Secrets 中确认 `EASYOA_RELEASE_SIGNING_KEY` 名称存在；未读取或修改 Secret 值。密钥与公钥是否匹配由实际发布 Workflow 的 fail-closed 签名 Gate 核实。
+- 用户提交的 `integrity/release-public-key.pem` 可解析为 Ed25519，DER SHA-256 指纹为 `f0df9322271978aa70628f5f3090648a625f8a42c089075d597577e88235028b`，已记录在 [信任说明](../integrity/README.md)。未生成或更换官方密钥。
+- 仓库扫描找到的 15 个 `.key` 均为 Git 忽略的隔离验收 TLS RSA 私钥，与官方 Ed25519 指纹不同；已跟踪文件没有私钥 PEM 头，Git 历史路径没有私钥、`.env` 或 `.ai-local`。这些测试 TLS 文件不会加入提交或资产。
+- Release 仍只接受 Tag push；`v*.*.*` 的 `*` 可匹配 RC 后缀，符合 [GitHub filter pattern](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#filter-pattern-cheat-sheet) 语义。发布脚本将带预发布后缀的 Tag 设为 `prerelease=true`，公钥优先使用仓库文件。
+
+远端 Tag、Release、官方资产和部署状态将在真实执行后追加，不以本地或测试替身结果代替。
+
+### RC Prep 本地 Gate
+
+JDK 21 下 `./mvnw test` 和 `./mvnw package` 均成功，每次实际执行 114 tests，0 failures / errors / skipped；最终 18 份 Surefire XML 核对一致，jar 构建元数据为 `0.2.0-rc.1`。Node 22 下 `npm ci`、`type-check`、`build` 均成功。完整脚本回归 30 tests，0 failures / errors / skipped，含原生 PowerShell 签名与配置测试以及真实 Nginx 代理测试。生产 / 开发 Compose、全部 Bash / PowerShell 解析、actionlint、`version.py --tag v0.2.0-rc.1`、文档链接和 `git diff --check` 均通过。
+
+本地首次静态检查使用了不存在的临时 PowerShell 文件路径，因此该检查退出 64；改为实际解析脚本后完整静态 Gate 退出 0。未修改产品代码或把失败改为 Skip。日志保存在 Git 忽略的 `.ai-local/rc-validation/official-rc-*`，不进入发行资产。

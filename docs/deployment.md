@@ -2,7 +2,7 @@
 
 从 v0.2.0 起，新的 Community Edition 使用 **AGPL-3.0-only**；历史 MIT 版本保持原许可证。生产统一入口为 `easyoactl`，默认显示帮助。源码开发使用 `easyoactl dev`。
 
-**当前 v0.2.0 为待发布版本，签名包尚未正式发布。** 本文的签名安装步骤供该发行包发布后使用；当前源码的本地运行方式见源码仓库中的 `docs/DEVELOPMENT.md`。旧版部署按对应 Tag 的文档执行，不混用入口。
+**当前版本为 v0.2.0-rc.1（Release Candidate / Pre-release），v0.2.0 尚未正式发布。** 本文的安装示例用于 RC 验证与使用观察；先确认 GitHub Releases 已发布该 Tag 及六项签名资产。当前源码的本地运行方式见源码仓库中的 `docs/DEVELOPMENT.md`。旧版部署按对应 Tag 的文档执行，不混用入口。
 
 本文保留 `deployment.md` 路径，因为发行保护清单、打包流程和回归测试已使用该路径；它是部署配置与运维说明的唯一主文档。
 
@@ -38,17 +38,17 @@ Internet → Nginx :80 / :443
 先从可信源码取得安装器及其配套 scripts，再通过独立可信渠道取得维护者公钥。不能把同一次下载中的公钥直接当作身份信任依据，也不要执行未经校验的 `curl | bash`。
 
 ```bash
-bash scripts/quick_start.sh --tag v0.2.0 \
+bash scripts/quick_start.sh --tag v0.2.0-rc.1 \
   --public-key /secure/easyoa-release-public-key.pem \
-  --destination /srv/EasyOA-v0.2.0
+  --destination /srv/EasyOA-v0.2.0-rc.1
 ```
 
-安装器下载六项资产，验证公钥、清单签名、压缩包校验值签名和实际 SHA-256，随后检查 tar 路径、链接、大小，再解压、验证包内文件并调用 `easyoactl install`。目标目录必须不存在。正式 v0.2.0 发布前上述下载地址尚不可用。
+安装器下载六项资产，验证公钥、清单签名、压缩包校验值签名和实际 SHA-256，随后检查 tar 路径、链接、大小，再解压、验证包内文件并调用 `easyoactl install`。目标目录必须不存在；正式 v0.2.0 Stable 的资产仍不可用。
 
 离线部署也必须先用独立可信公钥验证外部 `.sha256.sig`、校验压缩包，再安全解压。包内 `./easyoactl verify` 验证签名和全部受保护文件，不证明首次取得公钥的可信性。详细信任边界见 [integrity/README.md](../integrity/README.md)。
 
 ```bash
-cd /srv/EasyOA-v0.2.0
+cd /srv/EasyOA-v0.2.0-rc.1
 ./easyoactl help
 ./easyoactl verify
 ./easyoactl install
@@ -125,7 +125,7 @@ Windows 对应 `.\easyoactl.ps1 install -SelfSignedTls`；自签名证书不关�
 
 ```bash
 ./easyoactl backup
-./easyoactl restore /srv/EasyOA-v0.2.0/backups/easyoa-v0.2.0-TIMESTAMP-SUFFIX
+./easyoactl restore /srv/EasyOA-v0.2.0-rc.1/backups/easyoa-v0.2.0-rc.1-TIMESTAMP-SUFFIX
 ```
 
 备份短暂停止 API 写入，保存 PostgreSQL custom dump、附件 tar、VERSION、格式号、`.env` 和 TLS，生成校验清单；完成或失败均尝试恢复原先运行的 API。备份在 `backups/`，目录 700、文件 600，**包含部署秘密，应安全异地保存**；不包含发行签名私钥。

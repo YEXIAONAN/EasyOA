@@ -7,7 +7,7 @@
 <p align="center">EasyOA 是一款面向团队协作与项目管理的轻量级私有化协同办公系统。</p>
 
 <p align="center">
-  <a href="VERSION"><img src="https://img.shields.io/badge/version-v0.2.0%20%28pending%29-16A34A.svg" alt="Version: v0.2.0（待发布）" /></a>
+  <a href="VERSION"><img src="https://img.shields.io/badge/version-v0.2.0--rc.1%20%28Pre--release%29-16A34A.svg" alt="Version: v0.2.0-rc.1（Pre-release）" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-16A34A.svg" alt="License: AGPL-3.0-only" /></a>
   <img src="https://img.shields.io/badge/Java-21-16A34A.svg" alt="Java 21" />
   <img src="https://img.shields.io/badge/Spring%20Boot-3.5-16A34A.svg" alt="Spring Boot 3.5" />
@@ -103,7 +103,7 @@
 | 通知与搜索 | 接收任务、评论、审批和项目通知；用 ⌘K / Ctrl+K 搜索并直达有权访问的内容。 |
 | 安全与审计 | Session 认证、TOTP、登录设备管理、后端授权和操作留痕；ROOT 高危操作需再次验证与确认。 |
 | 数据洞察 | 查看项目健康度、任务趋势、逾期任务、成员负载与审批效率，统计范围随权限收敛。 |
-| 私有化部署 | 通过 Docker 在自己的服务器运行，使用命令入口管理服务、备份和恢复。v0.2.0 签名发行流程仍在验收。 |
+| 私有化部署 | 通过 Docker 在自己的服务器运行，使用命令入口管理服务、备份和恢复。v0.2.0-rc.1 为签名发行流程的 Release Candidate。 |
 
 权限、会话、审计和发行校验的边界见[安全说明](docs/SECURITY.md)。当前主要面向桌面 Web；窄屏截图用于展示已有适配，不代表独立移动端产品。
 
@@ -120,7 +120,7 @@
 
 访问启动器显示的 HTTPS 地址，首次进入 `/setup` 设置组织名称与 ROOT 账号，初始化完成后登录工作台。本机试用可使用 `install --self-signed-tls`；Windows 使用 `.\easyoactl.ps1`，详细步骤见部署指南。
 
-**v0.2.0 当前为待发布版本，签名包尚未正式发布。** 当前源码可按下方方式运行；旧版 v0.1.1 的安装方式以对应 Tag 文档为准。
+**当前开发版本为 v0.2.0-rc.1（Release Candidate / Pre-release），v0.2.0 尚未正式发布。** RC 用于安装验证与使用观察；仅从 [GitHub Releases](https://github.com/YEXIAONAN/EasyOA/releases) 下载已经发布的签名资产。当前源码可按下方方式运行；旧版 v0.1.1 的安装方式以对应 Tag 文档为准。
 
 ### 运行当前源码
 

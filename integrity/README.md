@@ -27,6 +27,16 @@ Windows 使用 `.\easyoactl.ps1 verify`。校验先验证签名，再解析路�
 
 ## 维护者
 
+官方公钥位于本仓库 `integrity/release-public-key.pem`。信任标识：
+
+```text
+Algorithm: Ed25519
+Public Key SHA-256 Fingerprint (DER):
+f0df9322271978aa70628f5f3090648a625f8a42c089075d597577e88235028b
+```
+
+下载公钥必须与此指纹及独立保存的维护者信任记录一致。
+
 在仓库外生成和保管 Ed25519 私钥，备份密钥并保护 GitHub 账号。仅将公钥提交或配置 Repository Variable。Actions 使用 Secret `EASYOA_RELEASE_SIGNING_KEY`；缺失或不匹配安全失败。公钥指纹：
 
 ```bash

@@ -1,5 +1,7 @@
 # EasyOA Distribution / Release 验收记录
 
+当前结论（2026-10-11）：**READY FOR RC TESTING**。官方 `v0.2.0-rc.1` 已自动签名发布并通过 GitHub 重新下载、安装、业务、备份恢复与重启验收；Stable `v0.2.0` 尚未发布。下文按批次保留历史证据，当前远端结果见文末官方 RC 记录。
+
 验收日期：2026-10-08 至 2026-10-09。工作区版本：`0.2.0`。
 本记录对应本次发行基础设施实现。业务 Phase 8 / Phase 9 已交付的范围保持不变。
 以下为该次历史记录；2026-10-10 至 2026-10-11 的 RC 验收结果在文末追加。
@@ -172,3 +174,60 @@ Tag 模式、版本一致性、Workflow 语法和依赖门禁已在本地检查�
 JDK 21 下 `./mvnw test` 和 `./mvnw package` 均成功，每次实际执行 114 tests，0 failures / errors / skipped；最终 18 份 Surefire XML 核对一致，jar 构建元数据为 `0.2.0-rc.1`。Node 22 下 `npm ci`、`type-check`、`build` 均成功。完整脚本回归 30 tests，0 failures / errors / skipped，含原生 PowerShell 签名与配置测试以及真实 Nginx 代理测试。生产 / 开发 Compose、全部 Bash / PowerShell 解析、actionlint、`version.py --tag v0.2.0-rc.1`、文档链接和 `git diff --check` 均通过。
 
 本地首次静态检查使用了不存在的临时 PowerShell 文件路径，因此该检查退出 64；改为实际解析脚本后完整静态 Gate 退出 0。未修改产品代码或把失败改为 Skip。日志保存在 Git 忽略的 `.ai-local/rc-validation/official-rc-*`，不进入发行资产。
+
+### 真实 GitHub 发布与官方下载验收
+
+Annotated Tag `v0.2.0-rc.1`（Tag object `9e2b3433290a4ecb8a8153bde10e1283e94c25e8`）已推送，指向 RC Prep Commit `23756c914b931331d49989a473e3b67b3e96349c`。推送 Tag 前，[main CI](https://github.com/YEXIAONAN/EasyOA/actions/runs/38113966579) 的六个 Job 全部成功。随后真实 Tag push 触发 [Release Workflow](https://github.com/YEXIAONAN/EasyOA/actions/runs/38114106270)，validate、复用 CI 的六个 Job 和 publish 共八个 Job 全部成功。
+
+Actions 使用已配置的官方 Secret 和仓库公钥，完成密钥匹配、镜像构建、组装、清单与归档 Ed25519 签名、六资产自检、Draft 创建、上传核对及自动发布。[EasyOA v0.2.0-rc.1](https://github.com/YEXIAONAN/EasyOA/releases/tag/v0.2.0-rc.1) 为非 Draft 的 **Pre-release**。Release Notes 自动提供 v0.1.1 至该 RC 的完整 Changelog；未手工创建 Release 或补传资产。
+
+GitHub API 列表准确包含六个已上传资产：
+
+```text
+EasyOA-v0.2.0-rc.1.tar.gz
+EasyOA-v0.2.0-rc.1.tar.gz.sha256
+EasyOA-v0.2.0-rc.1.tar.gz.sha256.sig
+manifest.sha256
+manifest.sig
+release-public-key.pem
+```
+
+这些资产全部从 GitHub Release 的下载 URL 重新下载到新目录，逐个核对 GitHub 记录的大小和摘要。归档共 361,379,831 bytes，下载传输一度中断，HTTPS 断点续传完成后重新核对整个文件，而不是验收部分下载。`shasum -a 256 -c` 和两份独立 Ed25519 验签均成功。归档 SHA-256：
+
+```text
+17258984cce1439f7e9a371dbd27acf826064906ed27a1468a328e7d04f1b313
+```
+
+下载公钥的 DER SHA-256 与发布前保存的用户提交公钥及其指纹一致：`f0df9322271978aa70628f5f3090648a625f8a42c089075d597577e88235028b`。仅在这些外部检查通过后安全解压；包内 manifest / signature / public key 与外部资产字节相同，`./easyoactl verify` 显示 Official / VERIFIED，94 个保护文件全部一致，113 个归档项未发现禁止打包内容。实际 jar 的 version、release-key-fingerprint、source-ref 分别为该 RC 版本、官方指纹和 RC Tag。
+
+```text
+Tag Trigger Verified: YES
+GitHub Release Creation Verified: YES
+Release Assets Upload Verified: YES
+Signature Generation Verified: YES
+Private Key Exposure: NO
+GitHub Asset Re-download: YES
+Checksum Verification: YES
+Signature Verification: YES
+Public Key Fingerprint Match: YES
+Official RC Clean Install: YES
+```
+
+未在 Git、发行资产或发布日志中发现 Release Private Key；API 镜像运行环境没有 signing secret，镜像历史没有私钥 PEM，Docker 构建只接收公钥指纹与源码引用。正式私钥未被读取到本机，也未修改 GitHub Secret 或官方 Key。
+
+### 官方包运行与运维
+
+官方下载包使用新目录 `official-clean-install`、新 Compose 项目 `easyoa-official-rc1`、全新 PostgreSQL / 附件卷、HTTP 18182 / HTTPS 18445 端口安装，使用新生成的随机部署凭据，生产种子关闭。仅沿用先前本机测试的 localhost TLS 证书，未沿用旧 RC 配置或业务数据。`install`、`start`、`status`、`doctor` 均成功，四个服务健康；新库 Setup required 为 true，组织和 ROOT 初始化、首次登录成功，再次 Setup 返回 409，初始化时目录仅含新 ROOT。
+
+真实 HTTP 完成成员、组织、项目、任务状态、评论、附件上传与下载、审批提交与批准、通知 / 已读、搜索、审计和数据中心；自批、缺失 CSRF、跨项目资源 / 附件访问、管理越权、归档写入及禁用旧会话均按预期拒绝。Edge 真实 About 页面显示 `EasyOA Community Edition`、`v0.2.0-rc.1`、`AGPL-3.0-only`、`YEXIAONAN` 和「官方签名版本」；API 同时返回 `Official` / `signatureVerified=true`，源码入口指向 `https://github.com/YEXIAONAN/EasyOA/tree/v0.2.0-rc.1`。初始化后 Edge 的 `/setup` 刷新转向登录入口。
+
+官方环境执行真实 `backup`，格式 1、VERSION、校验值和 700 / 600 私有权限验证成功。鉴于正式包的信任锚和 jar 与先前临时签名构建不同，本次重新完整恢复：另行从官方下载归档安全解压 `official-restore-install`，使用新项目 `easyoa-official-rc1-restore` 及另一组全新卷，恢复前确认 Setup required 为 true；原项目停用以避免端口冲突。`restore --yes` 先生成目标空库安全备份，再导入真实业务快照，健康检查成功。重新登录核对 User、Organization、Project、Task、Approval、Comment、Attachment、附件字节 / SHA-256、通知、审计及越权拒绝全部通过。
+
+Windows 原生 CI 发现 30 tests，16 项执行成功，14 项按 Bash / Docker / Unix 平台条件跳过；原生 PowerShell 签名、配置保留和所有脚本解析成功。真实 Windows Docker 生产启动仍未验收，不能由这些脚本结果代替。
+
+
+恢复后的 `stop → start` 及 `restart` 均完成，七类业务数据、附件字节 / SHA-256、通知、审计和访问范围保留，`.env` / TLS 哈希不变；原 servlet Cookie 返回 401，重新登录成功。再次 `doctor` 及公开 About 核对通过，身份仍为 `Official` / `signatureVerified=true`。两组官方测试环境均停止服务并保留目录、备份与四个独立数据卷；未删除用户原有数据卷或重写历史迁移、Tag、Release。
+
+本机证据在 Git 忽略的 `.ai-local/rc-validation/official-*`，私有备份不提交。RC Prep 四版本源及 annotated Tag 保持 `0.2.0-rc.1`，不创建 Stable `v0.2.0`。此前三个远端未验证项和正式资产阻塞现已由真实执行消除。
+
+**Release Blockers：无。Final Decision：READY FOR RC TESTING。** RC 仍需实际使用观察，不能视为 Stable 发布授权。已知限制继续适用：linux/amd64 单架构、Windows 运维命令与生产实测范围、v0.1.1 手动迁移；Deferred to v0.2.1 保留会话 / TOTP 密钥用途分离、审计页小文案、Playwright、Dependabot、CodeQL、SBOM，本次未实现。

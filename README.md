@@ -120,7 +120,7 @@
 
 访问启动器显示的 HTTPS 地址，首次进入 `/setup` 设置组织名称与 ROOT 账号，初始化完成后登录工作台。本机试用可使用 `install --self-signed-tls`；Windows 使用 `.\easyoactl.ps1`，详细步骤见部署指南。
 
-**当前开发版本为 v0.2.0-rc.1（Release Candidate / Pre-release），v0.2.0 尚未正式发布。** RC 用于安装验证与使用观察；仅从 [GitHub Releases](https://github.com/YEXIAONAN/EasyOA/releases) 下载已经发布的签名资产。当前源码可按下方方式运行；旧版 v0.1.1 的安装方式以对应 Tag 文档为准。
+**当前开发版本为 v0.2.0-rc.1（Release Candidate / Pre-release），v0.2.0 尚未正式发布。** 已发布 [v0.2.0-rc.1 Pre-release 签名资产](https://github.com/YEXIAONAN/EasyOA/releases/tag/v0.2.0-rc.1)，用于安装验证与使用观察。当前源码可按下方方式运行；旧版 v0.1.1 的安装方式以对应 Tag 文档为准。
 
 ### 运行当前源码
 
